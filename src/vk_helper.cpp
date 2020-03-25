@@ -502,6 +502,89 @@ bool create_swapchain_image_views(RendererState* state) {
     return true;
 }
 
+bool create_depth_image_views(RendererState* state) {
+    state->depth_image_views = (VkImageView*)calloc(state->swapchain_image_count, sizeof(VkImageView));
+
+    VkImageSubresourceRange subresource_range = {};
+    subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    subresource_range.baseMipLevel = 0;
+    subresource_range.levelCount = 1;
+    subresource_range.baseArrayLayer = 0;
+    subresource_range.layerCount = 1;
+
+    VkImageViewCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    create_info.format = VK_FORMAT_D32_SFLOAT;
+    create_info.subresourceRange = subresource_range;
+
+    for (int i = 0;i < state->swapchain_image_count;++i) {
+	create_info.image = state->depth_images[i];
+
+	VkResult result = vkCreateImageView(state->device, &create_info, nullptr, &state->depth_image_views[i]);
+	if (result != VK_SUCCESS) {
+	    free_null(state->depth_image_views);
+	    return false;
+	}
+    }
+
+    return true;
+}
+
+bool create_depth_images(RendererState* state) {
+    state->depth_images            = (VkImage*)calloc(state->swapchain_image_count, sizeof(VkImage));
+    state->depth_image_allocations = (AllocatedMemoryChunk*)calloc(state->swapchain_image_count, sizeof(AllocatedMemoryChunk));
+
+    VkImageCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    create_info.imageType = VK_IMAGE_TYPE_2D;
+    create_info.format = VK_FORMAT_D32_SFLOAT;
+    create_info.extent = { state->swapchain_extent.width, state->swapchain_extent.height, 1 };
+    create_info.mipLevels = 1;
+    create_info.arrayLayers = 1;
+    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info.queueFamilyIndexCount = 1;
+    create_info.pQueueFamilyIndices = &state->selection.graphics_queue_family_index;
+    create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    for (int i = 0;i < state->swapchain_image_count;++i) {
+	VkResult result = vkCreateImage(state->device, &create_info, nullptr, &state->depth_images[i]);
+	if (result != VK_SUCCESS) {
+	    free_null(state->depth_images);
+	    return false;
+	}
+    }
+
+    for (int i = 0;i < state->swapchain_image_count;++i) {
+	VkMemoryRequirements requirements = {};
+
+	vkGetImageMemoryRequirements(state->device, state->depth_images[i], &requirements);
+
+	VkMemoryPropertyFlags memory_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+	if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &state->depth_image_allocations[i])) {
+	    std::cout << "Error: failed to allocate memory chunk for image." << std::endl;
+	    free_null(state->depth_image_allocations);
+	    return false;
+	}
+
+	VkResult result = vkBindImageMemory(state->device, state->depth_images[i], state->depth_image_allocations[i].device_memory, state->depth_image_allocations[i].offset);
+	if (result != VK_SUCCESS) {
+	    free_null(state->depth_image_allocations);
+	    return false;
+	}
+    }
+
+    if (!create_depth_image_views(state)) {
+	return false;
+    }
+
+    return true;
+}
+
 bool create_semaphore(RendererState* state) {
     VkSemaphoreCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -564,6 +647,7 @@ bool create_command_pool(RendererState* state) {
 }
 
 bool create_descriptor_set_layout(RendererState* state) {
+    // Create Camera descriptor set layout
     VkDescriptorSetLayoutBinding binding = {};
     binding.binding = 0;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -575,7 +659,24 @@ bool create_descriptor_set_layout(RendererState* state) {
     create_info.bindingCount = 1;
     create_info.pBindings = &binding;
 
-    VkResult result = vkCreateDescriptorSetLayout(state->device, &create_info, nullptr, &state->descriptor_set_layout);
+    VkResult result = vkCreateDescriptorSetLayout(state->device, &create_info, nullptr, &state->descriptor_set_layouts[CameraDescriptorSetLayout]);
+
+    if (result != VK_SUCCESS) {
+	return false;
+    }
+
+    // Create model transform descriptor set layout
+    binding = {};
+    binding.binding = 0;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    binding.descriptorCount = 1;
+    binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    create_info.bindingCount = 1;
+    create_info.pBindings = &binding;
+
+    result = vkCreateDescriptorSetLayout(state->device, &create_info, nullptr, &state->descriptor_set_layouts[TransformDescriptorSetLayout]);
 
     if (result != VK_SUCCESS) {
 	return false;
@@ -587,8 +688,8 @@ bool create_descriptor_set_layout(RendererState* state) {
 bool create_pipeline_layout(RendererState* state) {
     VkPipelineLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create_info.setLayoutCount = 1;
-    create_info.pSetLayouts = &state->descriptor_set_layout;
+    create_info.setLayoutCount = CountDescriptorSetLayout;
+    create_info.pSetLayouts = state->descriptor_set_layouts;
 
     VkResult result = vkCreatePipelineLayout(state->device, &create_info, nullptr, &state->pipeline_layout);
     if (result != VK_SUCCESS) {
@@ -600,19 +701,32 @@ bool create_pipeline_layout(RendererState* state) {
 }
 
 bool create_render_pass(RendererState* state) {
-    VkAttachmentDescription attachment_description = {};
-    attachment_description.format = state->surface_format.format;
-    attachment_description.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachment_description.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_description.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_description.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_description.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    VkAttachmentDescription attachment_descriptions[2] = {};
+    attachment_descriptions[0].format = state->surface_format.format;
+    attachment_descriptions[0].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment_descriptions[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment_descriptions[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment_descriptions[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment_descriptions[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment_descriptions[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment_descriptions[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    attachment_descriptions[1].format = VK_FORMAT_D32_SFLOAT;
+    attachment_descriptions[1].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment_descriptions[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment_descriptions[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment_descriptions[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment_descriptions[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment_descriptions[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment_descriptions[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference attachment_reference = {};
     attachment_reference.attachment = 0;
     attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depth_attachment_reference = {};
+    depth_attachment_reference.attachment = 1;
+    depth_attachment_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass_description = {};
     subpass_description.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -621,7 +735,7 @@ bool create_render_pass(RendererState* state) {
     subpass_description.colorAttachmentCount = 1;
     subpass_description.pColorAttachments = &attachment_reference;
     subpass_description.pResolveAttachments = nullptr;
-    subpass_description.pDepthStencilAttachment = nullptr;
+    subpass_description.pDepthStencilAttachment = &depth_attachment_reference;
     subpass_description.preserveAttachmentCount = 0;
     subpass_description.pPreserveAttachments = nullptr;
 
@@ -635,8 +749,8 @@ bool create_render_pass(RendererState* state) {
 
     VkRenderPassCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    create_info.attachmentCount = 1;
-    create_info.pAttachments = &attachment_description;
+    create_info.attachmentCount = array_size(attachment_descriptions);
+    create_info.pAttachments = attachment_descriptions;
     create_info.subpassCount = 1;
     create_info.pSubpasses = &subpass_description;
     create_info.dependencyCount = 1;
@@ -728,6 +842,14 @@ bool create_graphics_pipeline(RendererState* state) {
     multisample_state_create_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     multisample_state_create_info.sampleShadingEnable = VK_FALSE;
 
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_state_create_info = {};
+    depth_stencil_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stencil_state_create_info.depthTestEnable = VK_TRUE;
+    depth_stencil_state_create_info.depthWriteEnable = VK_TRUE;
+    depth_stencil_state_create_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depth_stencil_state_create_info.depthBoundsTestEnable = VK_FALSE;
+    depth_stencil_state_create_info.stencilTestEnable = VK_FALSE;
+
     VkPipelineColorBlendAttachmentState color_blend_attachment = {};
     color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     color_blend_attachment.blendEnable = VK_TRUE;
@@ -753,6 +875,7 @@ bool create_graphics_pipeline(RendererState* state) {
     create_info.pViewportState = &viewport_state_create_info;
     create_info.pRasterizationState = &rasterization_state_create_info;
     create_info.pMultisampleState = &multisample_state_create_info;
+    create_info.pDepthStencilState = &depth_stencil_state_create_info;
     create_info.pColorBlendState = &color_blend_state_create_info;
     create_info.layout = state->pipeline_layout;
     create_info.renderPass = state->renderpass;
@@ -771,7 +894,7 @@ bool create_framebuffers(RendererState* state) {
     VkFramebufferCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     create_info.renderPass = state->renderpass;
-    create_info.attachmentCount = 1;
+    create_info.attachmentCount = 2;
     create_info.width = state->swapchain_extent.width;
     create_info.height = state->swapchain_extent.height;
     create_info.layers = 1;
@@ -779,7 +902,8 @@ bool create_framebuffers(RendererState* state) {
     state->framebuffers = (VkFramebuffer*)calloc(state->swapchain_image_count, sizeof(VkFramebuffer));
 
     for (int i = 0;i < state->swapchain_image_count;++i) {
-	create_info.pAttachments = &state->swapchain_image_views[i];
+	VkImageView attachments[2] = {state->swapchain_image_views[i], state->depth_image_views[i] };
+	create_info.pAttachments = attachments;
 
 	VkResult result = vkCreateFramebuffer(state->device, &create_info, nullptr, &state->framebuffers[i]);
 	if (result != VK_SUCCESS) {
@@ -792,15 +916,17 @@ bool create_framebuffers(RendererState* state) {
 }
 
 bool create_descriptor_pool(RendererState* state) {
-    VkDescriptorPoolSize pool_size = {};
-    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    pool_size.descriptorCount = 10;
+    VkDescriptorPoolSize pool_sizes[2] = {};
+    pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_sizes[0].descriptorCount = 256;
+    pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    pool_sizes[1].descriptorCount = 256;
 
     VkDescriptorPoolCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    create_info.maxSets = 10;
-    create_info.poolSizeCount = 1;
-    create_info.pPoolSizes = &pool_size;
+    create_info.maxSets = 256;
+    create_info.poolSizeCount = array_size(pool_sizes);
+    create_info.pPoolSizes = pool_sizes;
 
     VkResult result = vkCreateDescriptorPool(state->device, &create_info, nullptr, &state->descriptor_pool);
     if (result != VK_SUCCESS) {
@@ -810,190 +936,12 @@ bool create_descriptor_pool(RendererState* state) {
     return true;
 }
 
-bool allocate_descriptor_set(RendererState* state) {
-    state->descriptor_sets = (VkDescriptorSet*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSet));
-
-    VkDescriptorSetLayout* layouts;
-    layouts = (VkDescriptorSetLayout*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSetLayout));
-    for (int i = 0;i < state->swapchain_image_count;++i) {
-	layouts[i] = state->descriptor_set_layout;
-    }
-
-    VkDescriptorSetAllocateInfo allocate_info = {};
-    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocate_info.descriptorPool = state->descriptor_pool;
-    allocate_info.descriptorSetCount = state->swapchain_image_count;
-    allocate_info.pSetLayouts = layouts;
-
-    VkResult result = vkAllocateDescriptorSets(state->device, &allocate_info, state->descriptor_sets);
-    if (result != VK_SUCCESS) {
-	return false;
-    }
-
-    free_null(layouts);
-
-    return true;
-}
-
-bool create_vertex_buffer(RendererState* state) {
-    float z = 0.0f;
-    Vertex vertex_buffer[6] = {};
-    vertex_buffer[0].position = new_vec3f(-0.5, -0.5, z);
-    vertex_buffer[0].color    = new_vec3f(1.0, 0.0, 0.0);
-    vertex_buffer[1].position = new_vec3f(-0.5, 0.5, z);
-    vertex_buffer[1].color    = new_vec3f(0.0, 1.0, 0.0);
-    vertex_buffer[2].position = new_vec3f(0.5, -0.5, z);
-    vertex_buffer[2].color    = new_vec3f(0.0, 0.0, 1.0);
-
-    vertex_buffer[3].position = new_vec3f(-0.5, 0.5, z);
-    vertex_buffer[3].color    = new_vec3f(0.0, 1.0, 0.0);
-    vertex_buffer[4].position = new_vec3f(0.5, 0.5, z);
-    vertex_buffer[4].color    = new_vec3f(1.0, 1.0, 1.0);
-    vertex_buffer[5].position = new_vec3f(0.5, -0.5, z);
-    vertex_buffer[5].color    = new_vec3f(0.0, 0.0, 1.0);
-
-    uint32_t buffer_size = array_size(vertex_buffer) * sizeof(Vertex);
-
-    VkBufferCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = buffer_size;
-    create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 1;
-    create_info.pQueueFamilyIndices = &state->selection.graphics_queue_family_index;
-
-    VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->buffer);
-    if (result != VK_SUCCESS) {
-	return false;
-    }
-
-    VkMemoryRequirements requirements = {};
-
-    vkGetBufferMemoryRequirements(state->device, state->buffer, &requirements);
-
-    VkMemoryPropertyFlags memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-    if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &state->buffer_allocation)) {
-	return false;
-    }
-
-    result = vkBindBufferMemory(state->device, state->buffer, state->buffer_allocation.device_memory, state->buffer_allocation.offset);
-    if (result != VK_SUCCESS) {
-	return false;
-    }
-
-    memcpy(state->buffer_allocation.data, vertex_buffer, buffer_size);
-
-    return true;
-}
-
-bool create_context_ubo(RendererState* state) {
-    state->context.projection = perspective(70.0f, (float)state->swapchain_extent.width / (float)state->swapchain_extent.height, 0.1f, 100.0f);
-    state->context.view = look_at(new_vec3f(0.0f, 0.0f, 2.0f), new_vec3f(), new_vec3f(0.0f, 1.0f, 0.0f));
-
-    VkBufferCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = sizeof(Context);
-    create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 1;
-    create_info.pQueueFamilyIndices = &state->selection.graphics_queue_family_index;
-
-    state->context_buffers = (VkBuffer*)calloc(state->swapchain_image_count, sizeof(VkBuffer));
-    state->context_buffer_allocations = (AllocatedMemoryChunk*)calloc(state->swapchain_image_count, sizeof(AllocatedMemoryChunk));
-
-    for (int i = 0;i < state->swapchain_image_count;++i) {
-	VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->context_buffers[i]);
-	if (result != VK_SUCCESS) {
-	    return false;
-	}
-
-	VkMemoryRequirements requirements = {};
-
-	vkGetBufferMemoryRequirements(state->device, state->context_buffers[i], &requirements);
-
-	VkMemoryPropertyFlags memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-	if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &state->context_buffer_allocations[i])) {
-	    return false;
-	}
-
-	result = vkBindBufferMemory(state->device, state->context_buffers[i], state->context_buffer_allocations[i].device_memory, state->context_buffer_allocations[i].offset);
-	if (result != VK_SUCCESS) {
-	    return false;
-	}
-
-	memcpy(state->context_buffer_allocations[i].data, &state->context, sizeof(Context));
-    }
-
-    return true;
-}
-
-void update_descriptor_set(RendererState* state) {
-    VkDescriptorBufferInfo* buffer_info;
-
-    buffer_info = (VkDescriptorBufferInfo*)calloc(state->swapchain_image_count, sizeof(VkDescriptorBufferInfo));
-
-    for (int i = 0;i < state->swapchain_image_count;++i) {
-	buffer_info[i].buffer = state->context_buffers[i];
-	buffer_info[i].offset = 0;
-	buffer_info[i].range = sizeof(Context);
-    }
-
-    VkWriteDescriptorSet* writes;
-
-    writes = (VkWriteDescriptorSet*)calloc(state->swapchain_image_count, sizeof(VkWriteDescriptorSet));
-
-    for (int i = 0;i < state->swapchain_image_count;++i) {
-	writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[i].dstSet = state->descriptor_sets[i];
-	writes[i].dstBinding = 0;
-	writes[i].dstArrayElement = 0;
-	writes[i].descriptorCount = 1;
-	writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	writes[i].pBufferInfo = &buffer_info[i];
-    }
-
-    vkUpdateDescriptorSets(state->device, state->swapchain_image_count, writes, 0, nullptr);
-
-    free_null(buffer_info);
-    free_null(writes);
-}
-
 void destroy_window(RendererState* state, bool verbose) {
     if (state->window) {
 	if (verbose) {
 	    std::cout << "Destroying window" << std::endl;
 	}
 	glfwDestroyWindow(state->window);
-    }
-}
-
-void destroy_buffer(RendererState* state, bool verbose) {
-    if (state->buffer) {
-	if (verbose) {
-	    std::cout << "Destroying buffer (" << state->buffer << ")" << std::endl;
-	}
-	vkDestroyBuffer(state->device, state->buffer, nullptr);
-	free(&state->memory_manager, &state->buffer_allocation);
-    }
-
-    if (state->context_buffers) {
-	for (int i = 0;i < state->swapchain_image_count;i++) {
-	    if (verbose) {
-		std::cout << "Destroying context buffer (" << state->context_buffers[i] << ")" << std::endl;
-	    }
-	    vkDestroyBuffer(state->device, state->context_buffers[i], nullptr);
-	}
-
-	free_null(state->context_buffers);
-    }
-
-    if (state->context_buffer_allocations) {
-	for (int i = 0;i < state->swapchain_image_count;i++) {
-	    free(&state->memory_manager, &state->context_buffer_allocations[i]);
-	}
-	free_null(state->context_buffer_allocations);
     }
 }
 
@@ -1030,21 +978,14 @@ void destroy_renderpass(RendererState* state, bool verbose) {
     }
 }
 
-void destroy_descriptor_sets(RendererState* state, bool verbose) {
-    if (state->descriptor_sets) {
-	if (verbose) {
-	    std::cout << "Freeing descriptor sets" << std::endl;
-	}
-	free_null(state->descriptor_sets);
-    }
-}
-
 void destroy_descriptor_set_layout(RendererState* state, bool verbose) {
-    if (state->descriptor_set_layout) {
-	if (verbose) {
-	    std::cout << "Destroying decriptor set layout (" << state->descriptor_set_layout << ")" << std::endl;
+    for (int i = 0;i < CountDescriptorSetLayout;++i) {
+	if (state->descriptor_set_layouts[i]) {
+	    if (verbose) {
+		std::cout << "Destroying decriptor set layout (" << state->descriptor_set_layouts[i] << ")" << std::endl;
+	    }
+	    vkDestroyDescriptorSetLayout(state->device, state->descriptor_set_layouts[i], nullptr);
 	}
-	vkDestroyDescriptorSetLayout(state->device, state->descriptor_set_layout, nullptr);
     }
 }
 
@@ -1120,6 +1061,40 @@ void destroy_semaphores(RendererState* state, bool verbose) {
     }
 }
 
+void destroy_depth_images(RendererState* state, bool verbose) {
+    if (state->depth_image_views) {
+	for (int i = 0;i < state->swapchain_image_count;++i) {
+	    if (verbose) {
+		std::cout << "Destroying depth inage view (" << state->depth_image_views[i] << ")" << std::endl;
+	    }
+	    vkDestroyImageView(state->device, state->depth_image_views[i], nullptr);
+	}
+
+	free_null(state->depth_image_views);
+    }
+
+    if (state->depth_images) {
+	for (int i = 0;i < state->swapchain_image_count;++i) {
+	    if (verbose) {
+		std::cout << "Destroying depth image (" << state->depth_images[i] << ")" << std::endl;
+	    }
+	    vkDestroyImage(state->device, state->depth_images[i], nullptr);
+	}
+
+	free_null(state->depth_images);
+    }
+
+    if (state->depth_image_allocations) {
+	for (int i = 0;i < state->swapchain_image_count;++i) {
+	    if (verbose) {
+		std::cout << "Freeing depth image allocation (" << &state->depth_image_allocations[i] << ")" << std::endl;
+	    }
+	    free(&state->memory_manager, &state->depth_image_allocations[i]);
+	}
+	free_null(state->depth_image_allocations);
+    }
+}
+
 void destroy_swapchain_image_views(RendererState* state, bool verbose) {
     if (state->swapchain_image_views) {
 	for (int i = 0;i < state->swapchain_image_count;++i) {
@@ -1173,35 +1148,4 @@ void destroy_instance(RendererState* state, bool verbose) {
 	}
 	vkDestroyInstance(state->instance, nullptr);
     }
-}
-
-void cleanup(RendererState* state) {
-    for (int i = 0;i < state->swapchain_image_count;++i) {
-	vkWaitForFences(state->device, 1, &state->fences[i], VK_TRUE, 1000000000);
-    }
-
-    destroy_window(state, true);
-    glfwTerminate();
-
-    destroy_buffer(state, true);
-    destroy_framebuffers(state, true);
-    destroy_pipeline(state, true);
-
-    destroy_renderpass(state, true);
-    destroy_descriptor_sets(state, true);
-    destroy_descriptor_set_layout(state, true);
-    destroy_descriptor_pool(state, true);
-    destroy_pipeline_layout(state, true);
-    cleanup_shader_catalog(state->device, &state->shader_catalog, true);
-    destroy_command_pool(state, true);
-    destroy_fences(state, true);
-    destroy_submissions(state, true);
-    destroy_semaphores(state, true);
-    destroy_swapchain_image_views(state, true);
-    destroy_swapchain(state, true);
-    cleanup_memory(&state->memory_manager, state->device, true);
-
-    destroy_device(state, true);
-    destroy_surface(state, true);
-    destroy_instance(state, true);
 }

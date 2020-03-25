@@ -8,6 +8,8 @@
 #include "memory.hpp"
 #include "math.hpp"
 
+enum DescriptorSetLayoutName { CameraDescriptorSetLayout, TransformDescriptorSetLayout, CountDescriptorSetLayout };
+
 struct PhysicalDeviceSelection {
     VkPhysicalDevice device;
     uint32_t graphics_queue_family_index;
@@ -32,6 +34,33 @@ struct Context {
     Mat4f view;
 };
 
+struct CameraData {
+    VkDescriptorSet* descriptor_sets;
+    VkBuffer* buffers;
+    AllocatedMemoryChunk* allocations;
+
+    Context context;
+};
+
+struct Camera {
+    Vec3f position;
+    Vec3f center;
+    float aspect;
+    float fov;
+};
+
+struct SquareEntity {
+    VkDescriptorSet descriptor_set;
+    VkBuffer buffer;
+    AllocatedMemoryChunk allocation;
+};
+
+struct CubeEntity {
+    VkDescriptorSet descriptor_set;
+    VkBuffer buffer;
+    AllocatedMemoryChunk allocation;
+};
+
 struct RendererState {
     GLFWwindow* window;
     VkInstance instance;
@@ -52,27 +81,29 @@ struct RendererState {
     bool crashed;
     VkSemaphore* present_semaphores;
     VkSemaphore* acquire_semaphores;
+    VkFence* fences;
     VkCommandPool command_pool;
     VkPipelineLayout pipeline_layout;
-    VkDescriptorSetLayout descriptor_set_layout;
+    VkDescriptorSetLayout descriptor_set_layouts[CountDescriptorSetLayout];
     VkDescriptorPool descriptor_pool;
-    VkDescriptorSet* descriptor_sets;
     VkRenderPass renderpass;
     VkPipeline pipeline;
+    VkImage* depth_images;
+    AllocatedMemoryChunk* depth_image_allocations;
+    VkImageView* depth_image_views;
     VkFramebuffer* framebuffers;
 
-    VkFence* fences;
+    SquareEntity square_entity;
+    CubeEntity cube_entity;
+    Camera camera;
+    CameraData camera_data;
+
     CommandBufferSubmission* submissions;
+
     uint32_t last_image_index;
     uint32_t image_index;
-    VkBuffer buffer;
-    AllocatedMemoryChunk buffer_allocation;
-    VkBuffer* context_buffers;
-    AllocatedMemoryChunk* context_buffer_allocations;
-
     ShaderCatalog shader_catalog;
     MemoryManager memory_manager;
-    Context context;
 };
 
 #endif
