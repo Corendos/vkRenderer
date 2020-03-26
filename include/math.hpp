@@ -55,6 +55,7 @@ Mat4f new_mat4f(float m00, float m01, float m02, float m03,
 Mat4f identity_mat4f();
 Mat4f perspective(float fov, float aspect, float near, float far);
 Mat4f look_at(Vec3f eye, Vec3f origin, Vec3f up);
+Mat4f look_from_yaw_and_pitch(Vec3f position, float yaw, float pitch, Vec3f up);
 
 Mat4f scale_matrix(float scale_x, float scale_y, float scale_z);
 Mat4f rotation_matrix(float angle_x, float angle_y, float angle_z);
@@ -90,6 +91,8 @@ Vec4f operator-(Vec4f& a);
 
 Vec4f operator*(Mat4f& m, Vec4f& v);
 Mat4f operator*(Mat4f& m1, Mat4f& m2);
+
+float clamp(float value, float a, float b);
 
 
 #endif

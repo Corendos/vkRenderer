@@ -99,6 +99,18 @@ Mat4f look_at(Vec3f eye, Vec3f origin, Vec3f up) {
 		     0,         0,         0,         1);
 }
 
+Mat4f look_from_yaw_and_pitch(Vec3f position, float yaw, float pitch, Vec3f up) {
+    Mat4f m = {};
+    Vec3f forward = new_vec3f(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch));
+    Vec3f right = new_vec3f(cos(yaw), 0.0f, -sin(yaw));
+    Vec3f _up = cross(&forward, &right);
+
+    return new_mat4f(right.x,   right.y,   right.z,   -dot(&right, &position),
+		     _up.x,     _up.y,     _up.z,     -dot(&_up, &position),
+		     forward.x, forward.y, forward.z, -dot(&forward, &position),
+		     0,         0,         0,         1);
+}
+
 Mat4f scale_matrix(float scale_x, float scale_y, float scale_z) {
     Mat4f m = {};
 
@@ -220,7 +232,7 @@ float length(Vec4f* a) {
 
 Vec2f normalize(Vec2f* a) {
     float l = length(a);
-
+    if (l == 0.0) return *a;
     Vec2f v = {};
 
     v.x = a->x / l;
@@ -231,6 +243,7 @@ Vec2f normalize(Vec2f* a) {
 
 Vec3f normalize(Vec3f* a) {
     float l = length(a);
+    if (l == 0.0) return *a;
 
     Vec3f v = {};
 
@@ -243,6 +256,7 @@ Vec3f normalize(Vec3f* a) {
 
 Vec4f normalize(Vec4f* a) {
     float l = length(a);
+    if (l == 0.0) return *a;
 
     Vec4f v = {};
 
@@ -298,4 +312,14 @@ Vec4f operator*(Mat4f& m, Vec4f& v) {
 
 Mat4f operator*(Mat4f& m1, Mat4f& m2) {
     return mul(&m1, &m2);
+}
+
+float clamp(float value, float a, float b) {
+    if (value > b) {
+	return b;
+    }
+    if (value < a) {
+	return a;
+    }
+    return value;
 }

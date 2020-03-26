@@ -416,12 +416,13 @@ void update_camera_descriptor_set(RendererState* state) {
 
 bool init_camera(RendererState* state) {
     state->camera.fov = 70.0f;
-    state->camera.position = new_vec3f(0.0f, 0.0f, 2.0f);
-    state->camera.center = new_vec3f(0.0f, 0.0f, 0.0f);
+    state->camera.position = new_vec3f(0.0f, 0.0f, 0.0f);
+    state->camera.yaw = 0.0f;
+    state->camera.pitch = 0.0f;
     state->camera.aspect = (float)state->swapchain_extent.width / (float)state->swapchain_extent.height;
 
     state->camera_data.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
-    state->camera_data.context.view = look_at(state->camera.position, state->camera.center, new_vec3f(0.0f, 1.0f, 0.0f));
+    state->camera_data.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
 
     if (!allocate_camera_descriptor_sets(state)) {
 	return false;
@@ -631,8 +632,14 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
 	std::cout << "camera init : success" << std::endl;
     }
 
+    glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if (glfwRawMouseMotionSupported()) {
+	glfwSetInputMode(state->window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    }
     glfwSetWindowUserPointer(state->window, window_user_data);
     glfwSetKeyCallback(state->window, key_callback);
+    glfwSetCursorPosCallback(state->window, mouse_position_callback);
+    glfwSetMouseButtonCallback(state->window, mouse_button_callback);
     glfwSetWindowSizeCallback(state->window, window_resize_callback);
     glfwSetFramebufferSizeCallback(state->window, framebuffer_resize_callback);
 
@@ -671,15 +678,48 @@ void update_time(Time* time) {
     time->start = std::chrono::high_resolution_clock::now();
 }
 
-void update_camera(RendererState* state, Time* time) {
-    state->camera.position = new_vec3f(2.0f * sin(PI_2 * time->cumulated_time), 1.0f, 2.0f * cos(PI_2 * time->cumulated_time));
-    state->camera_data.context.view = look_at(state->camera.position, state->camera.center, new_vec3f(0.0f, 1.0f, 0.0f));
+void update_camera(RendererState* state, Input* input, Time* time) {
+    state->camera.yaw -= input->mouse_delta_x * 0.01f;
+    state->camera.pitch += input->mouse_delta_y * 0.01f;
+
+    if (state->camera.yaw > 2.0 * PI) {
+	state->camera.yaw -= 2.0 * PI;
+    } else if (state->camera.yaw < -2.0 * PI) {
+	state->camera.yaw += 2.0 * PI;
+    }
+    state->camera.pitch = clamp(state->camera.pitch, - PI_2 + PI / 10, PI_2 - PI / 10);
+
+    Vec3f forward = new_vec3f(-sin(state->camera.yaw) * cos(state->camera.pitch), -sin(state->camera.pitch), -cos(state->camera.yaw) * cos(state->camera.pitch));
+    Vec3f side = new_vec3f(cos(state->camera.yaw), 0.0f, -sin(state->camera.yaw));
+
+    Vec3f move_vector = new_vec3f();
+
+    if (input->key_pressed[GLFW_KEY_W]) {
+	move_vector = move_vector + forward;
+    }
+    if (input->key_pressed[GLFW_KEY_S]) {
+	move_vector = move_vector - forward;
+    }
+    if (input->key_pressed[GLFW_KEY_D]) {
+	move_vector = move_vector + side;
+    }
+    if (input->key_pressed[GLFW_KEY_A]) {
+	move_vector = move_vector - side;
+    }
+
+    move_vector = normalize(&move_vector);
+    move_vector.x = move_vector.x * 1.0f * time->delta_time;
+    move_vector.y = move_vector.y * 1.0f * time->delta_time;
+    move_vector.z = move_vector.z * 1.0f * time->delta_time;
+
+    state->camera.position = state->camera.position + move_vector;
+    state->camera_data.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
 }
 
 
-void update(RendererState* state, Time* time) {
+void update(RendererState* state, Input* input, Time* time) {
     update_time(time);
-    update_camera(state, time);
+    update_camera(state, input, time);
     memcpy(state->camera_data.allocations[state->image_index].data, &state->camera_data.context, sizeof(Context));
 }
 
@@ -793,7 +833,7 @@ void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time
 	return;
     }
 
-    update(state, time);
+    update(state, window_user_data->input, time);
     render(state);
 }
 
