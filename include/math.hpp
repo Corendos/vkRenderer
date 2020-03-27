@@ -93,6 +93,6 @@ Vec4f operator*(Mat4f& m, Vec4f& v);
 Mat4f operator*(Mat4f& m1, Mat4f& m2);
 
 float clamp(float value, float a, float b);
-
+float randf();
 
 #endif

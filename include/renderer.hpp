@@ -7,6 +7,9 @@
 #include "shaders.hpp"
 #include "memory.hpp"
 #include "math.hpp"
+#include "camera.hpp"
+
+#define MAX_ENTITY_COUNT 10240
 
 enum DescriptorSetLayoutName { CameraDescriptorSetLayout, TransformDescriptorSetLayout, CountDescriptorSetLayout };
 
@@ -29,28 +32,6 @@ struct Vertex {
     Vec3f color;
 };
 
-struct Context {
-    Mat4f projection;
-    Mat4f view;
-};
-
-struct CameraData {
-    VkDescriptorSet* descriptor_sets;
-    VkBuffer* buffers;
-    AllocatedMemoryChunk* allocations;
-
-    Context context;
-};
-
-struct Camera {
-    Vec3f position;
-    float aspect;
-    float fov;
-
-    float yaw;
-    float pitch;
-};
-
 struct SquareEntity {
     VkDescriptorSet descriptor_set;
     VkBuffer buffer;
@@ -61,6 +42,23 @@ struct CubeEntity {
     VkDescriptorSet descriptor_set;
     VkBuffer buffer;
     AllocatedMemoryChunk allocation;
+};
+
+struct Entity {
+    uint32_t id;
+    VkBuffer buffer;
+    AllocatedMemoryChunk allocation;
+    uint32_t size;
+    uint32_t offset;
+
+    Mat4f *transform;
+};
+
+struct EntityResources {
+    VkBuffer* buffers;
+    VkDescriptorSet* descriptor_sets;
+    AllocatedMemoryChunk* allocations;
+    Mat4f transforms[MAX_ENTITY_COUNT];
 };
 
 struct RendererState {
@@ -98,7 +96,7 @@ struct RendererState {
     SquareEntity square_entity;
     CubeEntity cube_entity;
     Camera camera;
-    CameraData camera_data;
+    CameraResources camera_resources;
 
     CommandBufferSubmission* submissions;
 
@@ -106,6 +104,12 @@ struct RendererState {
     uint32_t image_index;
     ShaderCatalog shader_catalog;
     MemoryManager memory_manager;
+
+    bool cursor_locked;
+
+    Entity entities[MAX_ENTITY_COUNT];
+    EntityResources entity_resources;
+    uint32_t entity_count;
 };
 
 #endif

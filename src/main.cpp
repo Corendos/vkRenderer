@@ -14,6 +14,7 @@
 #include "renderer.hpp"
 #include "shaders.hpp"
 #include "vk_helper.hpp"
+#include "camera.hpp"
 
 struct FpsCounter {
     std::chrono::time_point<std::chrono::high_resolution_clock, std::chrono::nanoseconds> start;
@@ -124,8 +125,57 @@ bool handle_swapchain_recreation(RendererState* state, WindowUserData* window_us
 	window_user_data->swapchain_need_recreation = false;
 
 	state->camera.aspect = (float)state->swapchain_extent.width / (float)state->swapchain_extent.height;
-	state->camera_data.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
+	state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
     }
+
+    return true;
+}
+
+
+bool create_entity(RendererState* state, Vertex* vertex_buffer, uint32_t vertex_buffer_size, uint32_t* entity_id) {
+    if (state->entity_count == MAX_ENTITY_COUNT) return false;
+
+    uint32_t buffer_size = vertex_buffer_size * sizeof(Vertex);
+
+    VkBufferCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    create_info.size = buffer_size;
+    create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info.queueFamilyIndexCount = 1;
+    create_info.pQueueFamilyIndices = &state->selection.graphics_queue_family_index;
+
+    Entity* entity = &state->entities[state->entity_count];
+
+    VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &entity->buffer);
+    if (result != VK_SUCCESS) {
+	return false;
+    }
+
+    VkMemoryRequirements requirements = {};
+
+    vkGetBufferMemoryRequirements(state->device, entity->buffer, &requirements);
+
+    VkMemoryPropertyFlags memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+    if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &entity->allocation)) {
+	return false;
+    }
+
+    result = vkBindBufferMemory(state->device, entity->buffer, entity->allocation.device_memory, entity->allocation.offset);
+    if (result != VK_SUCCESS) {
+	return false;
+    }
+
+    memcpy(entity->allocation.data, vertex_buffer, buffer_size);
+
+    entity->offset = state->entity_count * sizeof(Mat4f);
+    entity->transform = &state->entity_resources.transforms[state->entity_count];
+    *entity->transform = identity_mat4f();
+    entity->size = vertex_buffer_size;
+    entity->id = state->entity_count + 1;
+    *entity_id = entity->id;
+    state->entity_count++;
 
     return true;
 }
@@ -147,50 +197,20 @@ bool create_square_entity(RendererState* state) {
     vertex_buffer[5].position = new_vec3f(0.5, -0.5, z);
     vertex_buffer[5].color    = new_vec3f(0.0, 0.0, 1.0);
 
-    uint32_t buffer_size = array_size(vertex_buffer) * sizeof(Vertex);
+    uint32_t entity_id = 0;
 
-    VkBufferCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = buffer_size;
-    create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 1;
-    create_info.pQueueFamilyIndices = &state->selection.graphics_queue_family_index;
-
-    VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->square_entity.buffer);
-    if (result != VK_SUCCESS) {
-	return false;
-    }
-
-    VkMemoryRequirements requirements = {};
-
-    vkGetBufferMemoryRequirements(state->device, state->square_entity.buffer, &requirements);
-
-    VkMemoryPropertyFlags memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-    if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &state->square_entity.allocation)) {
-	return false;
-    }
-
-    result = vkBindBufferMemory(state->device, state->square_entity.buffer, state->square_entity.allocation.device_memory, state->square_entity.allocation.offset);
-    if (result != VK_SUCCESS) {
-	return false;
-    }
-
-    memcpy(state->square_entity.allocation.data, vertex_buffer, buffer_size);
-
-    return true;
+    return create_entity(state, vertex_buffer, array_size(vertex_buffer), &entity_id);
 }
 
-void create_cube(Vec3f size, Vec3f position, Vertex* vertices) {
+void create_cube(Vec3f size, Vertex* vertices) {
     // Front face
-    vertices[ 0].position = new_vec3f(-size.x + position.x, -size.y + position.y,  size.z + position.z);
-    vertices[ 1].position = new_vec3f(-size.x + position.x,  size.y + position.y,  size.z + position.z);
-    vertices[ 2].position = new_vec3f( size.x + position.x, -size.y + position.y,  size.z + position.z);
+    vertices[ 0].position = new_vec3f(-size.x, -size.y,  size.z);
+    vertices[ 1].position = new_vec3f(-size.x,  size.y,  size.z);
+    vertices[ 2].position = new_vec3f( size.x, -size.y,  size.z);
 
-    vertices[ 3].position = new_vec3f( size.x + position.x, -size.y + position.y,  size.z + position.z);
-    vertices[ 4].position = new_vec3f(-size.x + position.x,  size.y + position.y,  size.z + position.z);
-    vertices[ 5].position = new_vec3f( size.x + position.x,  size.y + position.y,  size.z + position.z);
+    vertices[ 3].position = new_vec3f( size.x, -size.y,  size.z);
+    vertices[ 4].position = new_vec3f(-size.x,  size.y,  size.z);
+    vertices[ 5].position = new_vec3f( size.x,  size.y,  size.z);
 
     vertices[ 0].color = new_vec3f(1.0f, 0.0f, 0.0f);
     vertices[ 1].color = new_vec3f(1.0f, 0.0f, 0.0f);
@@ -200,13 +220,13 @@ void create_cube(Vec3f size, Vec3f position, Vertex* vertices) {
     vertices[ 5].color = new_vec3f(1.0f, 0.0f, 0.0f);
 
     // Right face
-    vertices[ 6].position = new_vec3f( size.x + position.x, -size.y + position.y,  size.z + position.z);
-    vertices[ 7].position = new_vec3f( size.x + position.x,  size.y + position.y,  size.z + position.z);
-    vertices[ 8].position = new_vec3f( size.x + position.x, -size.y + position.y, -size.z + position.z);
+    vertices[ 6].position = new_vec3f( size.x, -size.y,  size.z);
+    vertices[ 7].position = new_vec3f( size.x,  size.y,  size.z);
+    vertices[ 8].position = new_vec3f( size.x, -size.y, -size.z);
 
-    vertices[ 9].position = new_vec3f( size.x + position.x, -size.y + position.y, -size.z + position.z);
-    vertices[10].position = new_vec3f( size.x + position.x,  size.y + position.y,  size.z + position.z);
-    vertices[11].position = new_vec3f( size.x + position.x,  size.y + position.y, -size.z + position.z);
+    vertices[ 9].position = new_vec3f( size.x, -size.y, -size.z);
+    vertices[10].position = new_vec3f( size.x,  size.y,  size.z);
+    vertices[11].position = new_vec3f( size.x,  size.y, -size.z);
 
     vertices[ 6].color = new_vec3f(0.0f, 1.0f, 0.0f);
     vertices[ 7].color = new_vec3f(0.0f, 1.0f, 0.0f);
@@ -216,13 +236,13 @@ void create_cube(Vec3f size, Vec3f position, Vertex* vertices) {
     vertices[11].color = new_vec3f(0.0f, 1.0f, 0.0f);
 
     // Back face
-    vertices[12].position = new_vec3f( size.x + position.x, -size.y + position.y, -size.z + position.z);
-    vertices[13].position = new_vec3f( size.x + position.x,  size.y + position.y, -size.z + position.z);
-    vertices[14].position = new_vec3f(-size.x + position.x, -size.y + position.y, -size.z + position.z);
+    vertices[12].position = new_vec3f( size.x, -size.y, -size.z);
+    vertices[13].position = new_vec3f( size.x,  size.y, -size.z);
+    vertices[14].position = new_vec3f(-size.x, -size.y, -size.z);
 
-    vertices[15].position = new_vec3f(-size.x + position.x, -size.y + position.y, -size.z + position.z);
-    vertices[16].position = new_vec3f( size.x + position.x,  size.y + position.y, -size.z + position.z);
-    vertices[17].position = new_vec3f(-size.x + position.x,  size.y + position.y, -size.z + position.z);
+    vertices[15].position = new_vec3f(-size.x, -size.y, -size.z);
+    vertices[16].position = new_vec3f( size.x,  size.y, -size.z);
+    vertices[17].position = new_vec3f(-size.x,  size.y, -size.z);
 
     vertices[12].color = new_vec3f(0.0f, 0.0f, 1.0f);
     vertices[13].color = new_vec3f(0.0f, 0.0f, 1.0f);
@@ -232,13 +252,13 @@ void create_cube(Vec3f size, Vec3f position, Vertex* vertices) {
     vertices[17].color = new_vec3f(0.0f, 0.0f, 1.0f);
 
     // Left face
-    vertices[18].position = new_vec3f(-size.x + position.x, -size.y + position.y, -size.z + position.z);
-    vertices[19].position = new_vec3f(-size.x + position.x,  size.y + position.y, -size.z + position.z);
-    vertices[20].position = new_vec3f(-size.x + position.x, -size.y + position.y,  size.z + position.z);
+    vertices[18].position = new_vec3f(-size.x, -size.y, -size.z);
+    vertices[19].position = new_vec3f(-size.x,  size.y, -size.z);
+    vertices[20].position = new_vec3f(-size.x, -size.y,  size.z);
 
-    vertices[21].position = new_vec3f(-size.x + position.x, -size.y + position.y,  size.z + position.z);
-    vertices[22].position = new_vec3f(-size.x + position.x,  size.y + position.y, -size.z + position.z);
-    vertices[23].position = new_vec3f(-size.x + position.x,  size.y + position.y,  size.z + position.z);
+    vertices[21].position = new_vec3f(-size.x, -size.y,  size.z);
+    vertices[22].position = new_vec3f(-size.x,  size.y, -size.z);
+    vertices[23].position = new_vec3f(-size.x,  size.y,  size.z);
 
     vertices[18].color = new_vec3f(1.0f, 0.0f, 1.0f);
     vertices[19].color = new_vec3f(1.0f, 0.0f, 1.0f);
@@ -248,13 +268,13 @@ void create_cube(Vec3f size, Vec3f position, Vertex* vertices) {
     vertices[23].color = new_vec3f(1.0f, 0.0f, 1.0f);
 
     // Top face
-    vertices[24].position = new_vec3f( size.x + position.x,  size.y + position.y,  size.z + position.z);
-    vertices[25].position = new_vec3f(-size.x + position.x,  size.y + position.y,  size.z + position.z);
-    vertices[26].position = new_vec3f( size.x + position.x,  size.y + position.y, -size.z + position.z);
+    vertices[24].position = new_vec3f( size.x,  size.y,  size.z);
+    vertices[25].position = new_vec3f(-size.x,  size.y,  size.z);
+    vertices[26].position = new_vec3f( size.x,  size.y, -size.z);
 
-    vertices[27].position = new_vec3f( size.x + position.x,  size.y + position.y, -size.z + position.z);
-    vertices[28].position = new_vec3f(-size.x + position.x,  size.y + position.y,  size.z + position.z);
-    vertices[29].position = new_vec3f(-size.x + position.x,  size.y + position.y, -size.z + position.z);
+    vertices[27].position = new_vec3f( size.x,  size.y, -size.z);
+    vertices[28].position = new_vec3f(-size.x,  size.y,  size.z);
+    vertices[29].position = new_vec3f(-size.x,  size.y, -size.z);
 
     vertices[24].color = new_vec3f(1.0f, 1.0f, 0.0f);
     vertices[25].color = new_vec3f(1.0f, 1.0f, 0.0f);
@@ -264,13 +284,13 @@ void create_cube(Vec3f size, Vec3f position, Vertex* vertices) {
     vertices[29].color = new_vec3f(1.0f, 1.0f, 0.0f);
 
     // Bottom face
-    vertices[30].position = new_vec3f(-size.x + position.x, -size.y + position.y,  size.z + position.z);
-    vertices[31].position = new_vec3f( size.x + position.x, -size.y + position.y,  size.z + position.z);
-    vertices[32].position = new_vec3f( size.x + position.x, -size.y + position.y, -size.z + position.z);
+    vertices[30].position = new_vec3f(-size.x, -size.y,  size.z);
+    vertices[31].position = new_vec3f( size.x, -size.y,  size.z);
+    vertices[32].position = new_vec3f( size.x, -size.y, -size.z);
 
-    vertices[33].position = new_vec3f( size.x + position.x, -size.y + position.y, -size.z + position.z);
-    vertices[34].position = new_vec3f(-size.x + position.x, -size.y + position.y, -size.z + position.z);
-    vertices[35].position = new_vec3f(-size.x + position.x, -size.y + position.y,  size.z + position.z);
+    vertices[33].position = new_vec3f( size.x, -size.y, -size.z);
+    vertices[34].position = new_vec3f(-size.x, -size.y, -size.z);
+    vertices[35].position = new_vec3f(-size.x, -size.y,  size.z);
 
     vertices[30].color = new_vec3f(0.0f, 1.0f, 1.0f);
     vertices[31].color = new_vec3f(0.0f, 1.0f, 1.0f);
@@ -280,47 +300,39 @@ void create_cube(Vec3f size, Vec3f position, Vertex* vertices) {
     vertices[35].color = new_vec3f(0.0f, 1.0f, 1.0f);
 }
 
+Mat4f random_translation_matrix(float range) {
+    return translation_matrix(2.0f * randf() * range - range,
+			      2.0f * randf() * range - range,
+			      2.0f * randf() * range - range);
+}
+
+Mat4f random_rotation_matrix() {
+    return rotation_matrix(2.0f * PI * randf(),
+			   2.0f * PI * randf(),
+			   2.0f * PI * randf());
+}
+
 bool create_cube_entity(RendererState* state) {
     Vertex vertex_buffer[36] = {};
-    create_cube(new_vec3f(0.2f, 0.2f, 0.2f), new_vec3f(1.0f, 0.0f, 0.0f), vertex_buffer);
+    create_cube(new_vec3f(0.2f, 0.2f, 0.2f), vertex_buffer);
 
-    uint32_t buffer_size = array_size(vertex_buffer) * sizeof(Vertex);
+    uint32_t entity_id = 0;
 
-    VkBufferCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = buffer_size;
-    create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 1;
-    create_info.pQueueFamilyIndices = &state->selection.graphics_queue_family_index;
-
-    VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->cube_entity.buffer);
-    if (result != VK_SUCCESS) {
+    if(!create_entity(state, vertex_buffer, array_size(vertex_buffer), &entity_id)) {
 	return false;
     }
 
-    VkMemoryRequirements requirements = {};
+    Entity* entity = &state->entities[entity_id - 1];
 
-    vkGetBufferMemoryRequirements(state->device, state->cube_entity.buffer, &requirements);
-
-    VkMemoryPropertyFlags memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-    if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &state->cube_entity.allocation)) {
-	return false;
-    }
-
-    result = vkBindBufferMemory(state->device, state->cube_entity.buffer, state->cube_entity.allocation.device_memory, state->cube_entity.allocation.offset);
-    if (result != VK_SUCCESS) {
-	return false;
-    }
-
-    memcpy(state->cube_entity.allocation.data, vertex_buffer, buffer_size);
+    Mat4f t = random_translation_matrix(5.0f);
+    Mat4f r = random_rotation_matrix();
+    *entity->transform = t * r;
 
     return true;
 }
 
 bool allocate_camera_descriptor_sets(RendererState* state) {
-    state->camera_data.descriptor_sets = (VkDescriptorSet*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSet));
+    state->camera_resources.descriptor_sets = (VkDescriptorSet*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSet));
 
     VkDescriptorSetLayout* layouts;
     layouts = (VkDescriptorSetLayout*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSetLayout));
@@ -334,9 +346,10 @@ bool allocate_camera_descriptor_sets(RendererState* state) {
     allocate_info.descriptorSetCount = state->swapchain_image_count;
     allocate_info.pSetLayouts = layouts;
 
-    VkResult result = vkAllocateDescriptorSets(state->device, &allocate_info, state->camera_data.descriptor_sets);
+    VkResult result = vkAllocateDescriptorSets(state->device, &allocate_info, state->camera_resources.descriptor_sets);
     if (result != VK_SUCCESS) {
 	return false;
+	free_null(layouts);
     }
 
     free_null(layouts);
@@ -345,39 +358,39 @@ bool allocate_camera_descriptor_sets(RendererState* state) {
 }
 
 bool create_camera_buffers(RendererState* state) {
-    state->camera_data.buffers     = (VkBuffer*)            calloc(state->swapchain_image_count, sizeof(VkBuffer));
-    state->camera_data.allocations = (AllocatedMemoryChunk*)calloc(state->swapchain_image_count, sizeof(AllocatedMemoryChunk));
+    state->camera_resources.buffers     = (VkBuffer*)            calloc(state->swapchain_image_count, sizeof(VkBuffer));
+    state->camera_resources.allocations = (AllocatedMemoryChunk*)calloc(state->swapchain_image_count, sizeof(AllocatedMemoryChunk));
 
     VkBufferCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = sizeof(Context);
+    create_info.size = sizeof(CameraContext);
     create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create_info.queueFamilyIndexCount = 1;
     create_info.pQueueFamilyIndices = &state->selection.graphics_queue_family_index;
 
     for (int i = 0;i < state->swapchain_image_count;++i) {
-	VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->camera_data.buffers[i]);
+	VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->camera_resources.buffers[i]);
 	if (result != VK_SUCCESS) {
 	    return false;
 	}
 
 	VkMemoryRequirements requirements = {};
 
-	vkGetBufferMemoryRequirements(state->device, state->camera_data.buffers[i], &requirements);
+	vkGetBufferMemoryRequirements(state->device, state->camera_resources.buffers[i], &requirements);
 
 	VkMemoryPropertyFlags memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
-	if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &state->camera_data.allocations[i])) {
+	if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &state->camera_resources.allocations[i])) {
 	    return false;
 	}
 
-	result = vkBindBufferMemory(state->device, state->camera_data.buffers[i], state->camera_data.allocations[i].device_memory, state->camera_data.allocations[i].offset);
+	result = vkBindBufferMemory(state->device, state->camera_resources.buffers[i], state->camera_resources.allocations[i].device_memory, state->camera_resources.allocations[i].offset);
 	if (result != VK_SUCCESS) {
 	    return false;
 	}
 
-	memcpy(state->camera_data.allocations[i].data, &state->camera_data.context, sizeof(Context));
+	memcpy(state->camera_resources.allocations[i].data, &state->camera.context, sizeof(CameraContext));
     }
 
     return true;
@@ -389,9 +402,9 @@ void update_camera_descriptor_set(RendererState* state) {
     buffer_info = (VkDescriptorBufferInfo*)calloc(state->swapchain_image_count, sizeof(VkDescriptorBufferInfo));
 
     for (int i = 0;i < state->swapchain_image_count;++i) {
-	buffer_info[i].buffer = state->camera_data.buffers[i];
+	buffer_info[i].buffer = state->camera_resources.buffers[i];
 	buffer_info[i].offset = 0;
-	buffer_info[i].range = sizeof(Context);
+	buffer_info[i].range = sizeof(CameraContext);
     }
 
     VkWriteDescriptorSet* writes;
@@ -400,7 +413,7 @@ void update_camera_descriptor_set(RendererState* state) {
 
     for (int i = 0;i < state->swapchain_image_count;++i) {
 	writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[i].dstSet = state->camera_data.descriptor_sets[i];
+	writes[i].dstSet = state->camera_resources.descriptor_sets[i];
 	writes[i].dstBinding = 0;
 	writes[i].dstArrayElement = 0;
 	writes[i].descriptorCount = 1;
@@ -417,12 +430,13 @@ void update_camera_descriptor_set(RendererState* state) {
 bool init_camera(RendererState* state) {
     state->camera.fov = 70.0f;
     state->camera.position = new_vec3f(0.0f, 0.0f, 0.0f);
-    state->camera.yaw = 0.0f;
+    state->camera.yaw = -PI_2;
     state->camera.pitch = 0.0f;
+    state->camera.speed = 0.7f;
     state->camera.aspect = (float)state->swapchain_extent.width / (float)state->swapchain_extent.height;
 
-    state->camera_data.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
-    state->camera_data.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
+    state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
+    state->camera.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
 
     if (!allocate_camera_descriptor_sets(state)) {
 	return false;
@@ -433,6 +447,116 @@ bool init_camera(RendererState* state) {
     }
 
     update_camera_descriptor_set(state);
+
+    return true;
+}
+
+bool create_entity_buffers(RendererState* state) {
+    state->entity_resources.buffers     = (VkBuffer*)            calloc(state->swapchain_image_count, sizeof(VkBuffer));
+    state->entity_resources.allocations = (AllocatedMemoryChunk*)calloc(state->swapchain_image_count, sizeof(AllocatedMemoryChunk));
+
+    VkBufferCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    create_info.size  = MAX_ENTITY_COUNT * sizeof(Mat4f);
+    create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info.queueFamilyIndexCount = 1;
+    create_info.pQueueFamilyIndices = &state->selection.graphics_queue_family_index;
+
+    for (int i = 0;i < state->swapchain_image_count;++i) {
+	VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->entity_resources.buffers[i]);
+	if (result != VK_SUCCESS) {
+	    return false;
+	}
+
+	VkMemoryRequirements requirements = {};
+
+	vkGetBufferMemoryRequirements(state->device, state->entity_resources.buffers[i], &requirements);
+
+	VkMemoryPropertyFlags memory_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+	if(!allocate(&state->memory_manager, state->device, requirements, memory_flags, &state->entity_resources.allocations[i])) {
+	    return false;
+	}
+
+	result = vkBindBufferMemory(state->device, state->entity_resources.buffers[i], state->entity_resources.allocations[i].device_memory, state->entity_resources.allocations[i].offset);
+	if (result != VK_SUCCESS) {
+	    return false;
+	}
+    }
+
+    return true;
+}
+
+bool create_entity_descriptor_sets(RendererState* state) {
+    state->entity_resources.descriptor_sets = (VkDescriptorSet*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSet));
+
+    VkDescriptorSetLayout* layouts;
+    layouts = (VkDescriptorSetLayout*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSetLayout));
+    for (int i = 0;i < state->swapchain_image_count;++i) {
+	layouts[i] = state->descriptor_set_layouts[TransformDescriptorSetLayout];
+    }
+
+    VkDescriptorSetAllocateInfo allocate_info = {};
+    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocate_info.descriptorPool = state->descriptor_pool;
+    allocate_info.descriptorSetCount = state->swapchain_image_count;
+    allocate_info.pSetLayouts = layouts;
+
+    VkResult result = vkAllocateDescriptorSets(state->device, &allocate_info, state->entity_resources.descriptor_sets);
+    if (result != VK_SUCCESS) {
+	return false;
+	free_null(layouts);
+    }
+
+    free_null(layouts);
+
+    return true;
+}
+
+void update_entity_descriptor_sets(RendererState* state) {
+    VkDescriptorBufferInfo* buffer_info;
+
+    buffer_info = (VkDescriptorBufferInfo*)calloc(state->swapchain_image_count, sizeof(VkDescriptorBufferInfo));
+
+    for (int i = 0;i < state->swapchain_image_count;++i) {
+	buffer_info[i].buffer = state->entity_resources.buffers[i];
+	buffer_info[i].offset = 0;
+	buffer_info[i].range = sizeof(Mat4f);
+    }
+
+    VkWriteDescriptorSet* writes;
+
+    writes = (VkWriteDescriptorSet*)calloc(state->swapchain_image_count, sizeof(VkWriteDescriptorSet));
+
+    for (int i = 0;i < state->swapchain_image_count;++i) {
+	writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[i].dstSet = state->entity_resources.descriptor_sets[i];
+	writes[i].dstBinding = 0;
+	writes[i].dstArrayElement = 0;
+	writes[i].descriptorCount = 1;
+	writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	writes[i].pBufferInfo = &buffer_info[i];
+    }
+
+    vkUpdateDescriptorSets(state->device, state->swapchain_image_count, writes, 0, nullptr);
+
+    free_null(buffer_info);
+    free_null(writes);
+}
+
+bool init_entities(RendererState* state) {
+    if (!create_entity_buffers(state)) {
+	std::cout << "Error: failed to create entity buffers" << std::endl;
+	return false;
+    }
+
+    if (!create_entity_descriptor_sets(state)) {
+	std::cout << "Error: failed to create entity descriptor sets" << std::endl;
+	return false;
+    }
+
+    update_entity_descriptor_sets(state);
 
     return true;
 }
@@ -614,34 +738,38 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
 	std::cout << "framebuffers init: success" << std::endl;
     }
 
-    if (!create_square_entity(state)) {
-	return false;
-    } else {
-	std::cout << "square entity init : success" << std::endl;
-    }
-
-    if (!create_cube_entity(state)) {
-	return false;
-    } else {
-	std::cout << "cube entity init : success" << std::endl;
-    }
-
     if (!init_camera(state)) {
 	return false;
     } else {
 	std::cout << "camera init : success" << std::endl;
     }
 
-    glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    if (glfwRawMouseMotionSupported()) {
-	glfwSetInputMode(state->window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    if (!init_entities(state)) {
+	return false;
+    } else {
+	std::cout << "entities init : success" << std::endl;
     }
+
+    for (int i = 0;i < 1000;++i) {
+	if (!create_cube_entity(state)) {
+	    return false;
+	} else {
+	    std::cout << "cube entity " << i << " init : success" << std::endl;
+	}
+    }
+
     glfwSetWindowUserPointer(state->window, window_user_data);
     glfwSetKeyCallback(state->window, key_callback);
     glfwSetCursorPosCallback(state->window, mouse_position_callback);
     glfwSetMouseButtonCallback(state->window, mouse_button_callback);
     glfwSetWindowSizeCallback(state->window, window_resize_callback);
     glfwSetFramebufferSizeCallback(state->window, framebuffer_resize_callback);
+
+    state->cursor_locked = true;
+    glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if (glfwRawMouseMotionSupported()) {
+	glfwSetInputMode(state->window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    }
 
     return true;
 }
@@ -679,15 +807,17 @@ void update_time(Time* time) {
 }
 
 void update_camera(RendererState* state, Input* input, Time* time) {
-    state->camera.yaw -= input->mouse_delta_x * 0.01f;
-    state->camera.pitch += input->mouse_delta_y * 0.01f;
+    if (state->cursor_locked) {
+	state->camera.yaw -= input->mouse_delta_x * state->camera.speed * time->delta_time;
+	state->camera.pitch += input->mouse_delta_y * state->camera.speed * time->delta_time;
+    }
 
     if (state->camera.yaw > 2.0 * PI) {
 	state->camera.yaw -= 2.0 * PI;
     } else if (state->camera.yaw < -2.0 * PI) {
 	state->camera.yaw += 2.0 * PI;
     }
-    state->camera.pitch = clamp(state->camera.pitch, - PI_2 + PI / 10, PI_2 - PI / 10);
+    state->camera.pitch = clamp(state->camera.pitch, - PI_2, PI_2);
 
     Vec3f forward = new_vec3f(-sin(state->camera.yaw) * cos(state->camera.pitch), -sin(state->camera.pitch), -cos(state->camera.yaw) * cos(state->camera.pitch));
     Vec3f side = new_vec3f(cos(state->camera.yaw), 0.0f, -sin(state->camera.yaw));
@@ -713,14 +843,35 @@ void update_camera(RendererState* state, Input* input, Time* time) {
     move_vector.z = move_vector.z * 1.0f * time->delta_time;
 
     state->camera.position = state->camera.position + move_vector;
-    state->camera_data.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
+    state->camera.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
 }
 
+void update_entities(RendererState* state) {
+    memcpy(state->entity_resources.allocations[state->image_index].data, state->entity_resources.transforms, state->entity_count * sizeof(Mat4f));
+}
 
 void update(RendererState* state, Input* input, Time* time) {
     update_time(time);
     update_camera(state, input, time);
-    memcpy(state->camera_data.allocations[state->image_index].data, &state->camera_data.context, sizeof(Context));
+    update_entities(state);
+    memcpy(state->camera_resources.allocations[state->image_index].data, &state->camera.context, sizeof(CameraContext));
+
+
+    if (input->button_just_pressed[GLFW_MOUSE_BUTTON_RIGHT]) {
+	state->cursor_locked = !state->cursor_locked;
+
+	if (state->cursor_locked) {
+	    glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	    if (glfwRawMouseMotionSupported()) {
+		glfwSetInputMode(state->window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+	    }
+	} else {
+	    glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	    if (glfwRawMouseMotionSupported()) {
+		glfwSetInputMode(state->window, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);
+	    }
+	}
+    }
 }
 
 void render(RendererState* state) {
@@ -764,12 +915,19 @@ void render(RendererState* state) {
     vkCmdBeginRenderPass(command_buffer, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline);
     VkDeviceSize offset = 0;
-    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->camera_data.descriptor_sets[state->image_index], 0, nullptr);
-    vkCmdBindVertexBuffers(command_buffer, 0, 1, &state->square_entity.buffer, &offset);
-    vkCmdDraw(command_buffer, 6, 1, 0, 0);
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->camera_resources.descriptor_sets[state->image_index], 0, nullptr);
 
-    vkCmdBindVertexBuffers(command_buffer, 0, 1, &state->cube_entity.buffer, &offset);
-    vkCmdDraw(command_buffer, 36, 1, 0, 0);
+    for (int i = 0;i < state->entity_count;++i) {
+	vkCmdBindDescriptorSets(
+				command_buffer,
+				VK_PIPELINE_BIND_POINT_GRAPHICS,
+				state->pipeline_layout,
+				1, 1,
+				&state->entity_resources.descriptor_sets[state->image_index],
+				1, &state->entities[i].offset);
+	vkCmdBindVertexBuffers(command_buffer, 0, 1, &state->entities[i].buffer, &offset);
+	vkCmdDraw(command_buffer, state->entities[i].size, 1, 0, 0);
+    }
 
     vkCmdEndRenderPass(command_buffer);
     vkEndCommandBuffer(command_buffer);
@@ -858,22 +1016,53 @@ void destroy_cube_entity(RendererState* state, bool verbose = true) {
 }
 
 void destroy_camera(RendererState* state, bool verbose = true) {
-    if (state->camera_data.buffers) {
+    if (state->camera_resources.buffers) {
 	for (int i = 0;i < state->swapchain_image_count;i++) {
 	    if (verbose) {
-		std::cout << "Destroying camera data buffer (" << state->camera_data.buffers[i] << ")" << std::endl;
+		std::cout << "Destroying camera data buffer (" << state->camera_resources.buffers[i] << ")" << std::endl;
 	    }
-	    vkDestroyBuffer(state->device, state->camera_data.buffers[i], nullptr);
+	    vkDestroyBuffer(state->device, state->camera_resources.buffers[i], nullptr);
 	}
 
-	free_null(state->camera_data.buffers);
+	free_null(state->camera_resources.buffers);
     }
 
-    if (state->camera_data.allocations) {
+    if (state->camera_resources.allocations) {
 	for (int i = 0;i < state->swapchain_image_count;i++) {
-	    free(&state->memory_manager, &state->camera_data.allocations[i]);
+	    free(&state->memory_manager, &state->camera_resources.allocations[i]);
 	}
-	free_null(state->camera_data.allocations);
+	free_null(state->camera_resources.allocations);
+    }
+}
+
+void destroy_entity_resources(RendererState* state, bool verbose = true) {
+    if (state->entity_resources.buffers) {
+	for (int i = 0;i < state->swapchain_image_count;++i) {
+	    if (verbose) {
+		std::cout << "Destroying entity buffer (" << state->entity_resources.buffers[i] << ")" << std::endl;
+	    }
+	    vkDestroyBuffer(state->device, state->entity_resources.buffers[i], nullptr);
+	}
+
+	free_null(state->entity_resources.buffers);
+    }
+
+    if (state->entity_resources.allocations) {
+	for (int i = 0;i < state->swapchain_image_count;++i) {
+	    free(&state->memory_manager, &state->entity_resources.allocations[i]);
+	}
+
+	free_null(state->entity_resources.allocations);
+    }
+}
+
+void destroy_entities(RendererState* state, bool verbose = true) {
+    for (int i = 0;i < state->entity_count;++i) {
+	if (verbose) {
+	    std::cout << "Destroying entity " << i << std::endl;
+	}
+	vkDestroyBuffer(state->device, state->entities[i].buffer, nullptr);
+	free(&state->memory_manager, &state->entities[i].allocation);
     }
 }
 
@@ -887,6 +1076,8 @@ void cleanup(RendererState* state) {
     destroy_window(state, true);
     glfwTerminate();
 
+    destroy_entities(state, true);
+    destroy_entity_resources(state, true);
     destroy_camera(state, true);
     destroy_square_entity(state, true);
     destroy_cube_entity(state, true);

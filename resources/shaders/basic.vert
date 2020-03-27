@@ -10,7 +10,11 @@ layout(set = 0, binding = 0) uniform Context {
     mat4 view;
 } ctx;
 
+layout(set = 1, binding = 0) uniform Model {
+    mat4 matrix;
+} model;
+
 void main() {
-    gl_Position = ctx.projection * ctx.view * vec4(position, 1.0);
+    gl_Position = ctx.projection * ctx.view * model.matrix * vec4(position, 1.0);
     fragColor = color;
 }

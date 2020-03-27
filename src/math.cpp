@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <cstdlib>
 
 Vec2f new_vec2f(float x, float y) {
     Vec2f v = {};
@@ -322,4 +323,8 @@ float clamp(float value, float a, float b) {
 	return a;
     }
     return value;
+}
+
+float randf() {
+    return (float)rand() / (float)RAND_MAX;
 }
