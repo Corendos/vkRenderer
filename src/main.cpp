@@ -13,6 +13,7 @@
 #include "window_user_data.hpp"
 #include "renderer.hpp"
 #include "shaders.hpp"
+#include "texture.hpp"
 #include "vk_helper.hpp"
 #include "camera.hpp"
 
@@ -77,13 +78,13 @@ bool handle_swapchain_recreation(RendererState* state, WindowUserData* window_us
 	// Wait for the last frame in flight to be ready
 	VkResult result = vkQueueWaitIdle(state->graphics_queue);
 	if (result != VK_SUCCESS) {
-	    std::cout << "Failed to wait for queue idle" << std::endl;
+	    std::cout << "vkQueueWaitIdle returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
 
 	result = vkQueueWaitIdle(state->present_queue);
 	if (result != VK_SUCCESS) {
-	    std::cout << "Failed to wait for queue idle" << std::endl;
+	    std::cout << "vkQueueWaitIdle returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
 
@@ -149,6 +150,7 @@ bool create_entity(RendererState* state, Vertex* vertex_buffer, uint32_t vertex_
 
     VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &entity->buffer);
     if (result != VK_SUCCESS) {
+	std::cout << "vkCreateBuffer returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -164,6 +166,7 @@ bool create_entity(RendererState* state, Vertex* vertex_buffer, uint32_t vertex_
 
     result = vkBindBufferMemory(state->device, entity->buffer, entity->allocation.device_memory, entity->allocation.offset);
     if (result != VK_SUCCESS) {
+	std::cout << "vkBindBufferMemory returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -348,6 +351,7 @@ bool allocate_camera_descriptor_sets(RendererState* state) {
 
     VkResult result = vkAllocateDescriptorSets(state->device, &allocate_info, state->camera_resources.descriptor_sets);
     if (result != VK_SUCCESS) {
+	std::cout << "vkAllocateDescriptorSets returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
 	free_null(layouts);
     }
@@ -372,6 +376,7 @@ bool create_camera_buffers(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
 	VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->camera_resources.buffers[i]);
 	if (result != VK_SUCCESS) {
+	    std::cout << "vkCreateBuffer returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
 
@@ -387,6 +392,7 @@ bool create_camera_buffers(RendererState* state) {
 
 	result = vkBindBufferMemory(state->device, state->camera_resources.buffers[i], state->camera_resources.allocations[i].device_memory, state->camera_resources.allocations[i].offset);
 	if (result != VK_SUCCESS) {
+	std::cout << "vkBindBufferMemory returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
 
@@ -466,6 +472,7 @@ bool create_entity_buffers(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
 	VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->entity_resources.buffers[i]);
 	if (result != VK_SUCCESS) {
+	    std::cout << "vkCreateBuffer returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
 
@@ -481,6 +488,7 @@ bool create_entity_buffers(RendererState* state) {
 
 	result = vkBindBufferMemory(state->device, state->entity_resources.buffers[i], state->entity_resources.allocations[i].device_memory, state->entity_resources.allocations[i].offset);
 	if (result != VK_SUCCESS) {
+	    std::cout << "vkBindBufferMemory returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
     }
@@ -505,6 +513,7 @@ bool create_entity_descriptor_sets(RendererState* state) {
 
     VkResult result = vkAllocateDescriptorSets(state->device, &allocate_info, state->entity_resources.descriptor_sets);
     if (result != VK_SUCCESS) {
+	std::cout << "vkAllocateDescriptorSets returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
 	free_null(layouts);
     }
@@ -738,6 +747,24 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
 	std::cout << "framebuffers init: success" << std::endl;
     }
 
+    if (!init_texture_catalog(state, 32)) {
+	return false;
+    } else {
+	std::cout << "texture catalog init: success" << std::endl;
+    }
+
+    if(!load_texture(state, "resources/textures/wood_1024.png", "wood_1024")) {
+	return false;
+    }
+
+    if(!load_texture(state, "resources/textures/wood_2048.png", "wood_2048")) {
+	return false;
+    }
+
+    if(!load_texture(state, "resources/textures/wood_4096.png", "wood_4096")) {
+	return false;
+    }
+
     if (!init_camera(state)) {
 	return false;
     } else {
@@ -750,7 +777,7 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
 	std::cout << "entities init : success" << std::endl;
     }
 
-    for (int i = 0;i < 1000;++i) {
+    for (int i = 0;i < 10;++i) {
 	if (!create_cube_entity(state)) {
 	    return false;
 	} else {
@@ -777,7 +804,8 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
 bool acquire_next_image(RendererState* state) {
     VkResult result = vkAcquireNextImageKHR(state->device, state->swapchain, 1000000000, state->acquire_semaphores[state->last_image_index], VK_NULL_HANDLE, &state->image_index);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to acquire next image" << std::endl;
+	// @Note: This would probably return UNKNOWN
+	std::cout << "vkAcquireNextImageKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -787,12 +815,13 @@ bool acquire_next_image(RendererState* state) {
 bool wait_for_fence(RendererState* state) {
     VkResult result = vkWaitForFences(state->device, 1, state->submissions[state->image_index].fence, VK_TRUE, UINT64_MAX);
     if (result != VK_SUCCESS) {
-	std::cout << "Failed to wait for fence (" << result << ")" << std::endl;
+	std::cout << "vkWaitForFences returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
     result = vkResetFences(state->device, 1, state->submissions[state->image_index].fence);
     if (result != VK_SUCCESS) {
+	std::cout << "vkResetFences returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -885,6 +914,7 @@ void render(RendererState* state) {
 
     VkResult allocate_result = vkAllocateCommandBuffers(state->device, &allocate_info, &command_buffer);
     if (allocate_result != VK_SUCCESS) {
+	std::cout << "vkAllocateCommandBuffers returned (" << vk_error_code_str(allocate_result) << ")" << std::endl;
 	state->crashed = true;
 	return;
     }
@@ -895,6 +925,7 @@ void render(RendererState* state) {
 
     VkResult result = vkBeginCommandBuffer(command_buffer, &begin_info);
     if (result != VK_SUCCESS) {
+	std::cout << "vkBeginCommandBuffer returned (" << vk_error_code_str(result) << ")" << std::endl;
 	state->crashed = true;
 	return;
     }
@@ -951,6 +982,7 @@ void render(RendererState* state) {
 
     result = vkQueueSubmit(state->graphics_queue, 1, &submit_info, *state->submissions[state->image_index].fence);
     if (result != VK_SUCCESS) {
+	std::cout << "vkQueueSubmit returned (" << vk_error_code_str(result) << ")" << std::endl;
 	state->crashed = true;
 	return;
     }
@@ -967,6 +999,8 @@ void render(RendererState* state) {
 
     result = vkQueuePresentKHR(state->present_queue, &present_info);
     if (result != VK_SUCCESS) {
+	// @Note: this will probably return UNKNOWN
+	std::cout << "vkQueuePresentKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	state->crashed;
 	return;
     }
@@ -995,26 +1029,6 @@ void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time
     render(state);
 }
 
-void destroy_square_entity(RendererState* state, bool verbose = true) {
-    if (state->square_entity.buffer) {
-	if (verbose) {
-	    std::cout << "Destroying square entity buffer (" << state->square_entity.buffer << ")" << std::endl;
-	}
-	vkDestroyBuffer(state->device, state->square_entity.buffer, nullptr);
-	free(&state->memory_manager, &state->square_entity.allocation);
-    }
-}
-
-void destroy_cube_entity(RendererState* state, bool verbose = true) {
-    if (state->square_entity.buffer) {
-	if (verbose) {
-	    std::cout << "Destroying cube entity buffer (" << state->cube_entity.buffer << ")" << std::endl;
-	}
-	vkDestroyBuffer(state->device, state->cube_entity.buffer, nullptr);
-	free(&state->memory_manager, &state->cube_entity.allocation);
-    }
-}
-
 void destroy_camera(RendererState* state, bool verbose = true) {
     if (state->camera_resources.buffers) {
 	for (int i = 0;i < state->swapchain_image_count;i++) {
@@ -1032,6 +1046,10 @@ void destroy_camera(RendererState* state, bool verbose = true) {
 	    free(&state->memory_manager, &state->camera_resources.allocations[i]);
 	}
 	free_null(state->camera_resources.allocations);
+    }
+
+    if (state->camera_resources.descriptor_sets) {
+	free_null(state->camera_resources.descriptor_sets);
     }
 }
 
@@ -1053,6 +1071,10 @@ void destroy_entity_resources(RendererState* state, bool verbose = true) {
 	}
 
 	free_null(state->entity_resources.allocations);
+    }
+
+    if (state->entity_resources.descriptor_sets) {
+	free_null(state->entity_resources.descriptor_sets);
     }
 }
 
@@ -1079,9 +1101,8 @@ void cleanup(RendererState* state) {
     destroy_entities(state, true);
     destroy_entity_resources(state, true);
     destroy_camera(state, true);
-    destroy_square_entity(state, true);
-    destroy_cube_entity(state, true);
 
+    cleanup_texture_catalog(state, true);
     destroy_framebuffers(state, true);
     destroy_pipeline(state, true);
 

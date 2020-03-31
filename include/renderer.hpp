@@ -5,11 +5,12 @@
 #include <vulkan/vulkan.h>
 
 #include "shaders.hpp"
+#include "texture.hpp"
 #include "memory.hpp"
 #include "math.hpp"
 #include "camera.hpp"
 
-#define MAX_ENTITY_COUNT 10240
+#define MAX_ENTITY_COUNT 1024
 
 enum DescriptorSetLayoutName { CameraDescriptorSetLayout, TransformDescriptorSetLayout, CountDescriptorSetLayout };
 
@@ -93,8 +94,6 @@ struct RendererState {
     VkImageView* depth_image_views;
     VkFramebuffer* framebuffers;
 
-    SquareEntity square_entity;
-    CubeEntity cube_entity;
     Camera camera;
     CameraResources camera_resources;
 
@@ -104,6 +103,8 @@ struct RendererState {
     uint32_t image_index;
     ShaderCatalog shader_catalog;
     MemoryManager memory_manager;
+
+    TextureCatalog texture_catalog;
 
     bool cursor_locked;
 

@@ -6,6 +6,7 @@
 
 #include "renderer.hpp"
 
+const char* vk_error_code_str(VkResult result);
 bool check_queue_availability(PhysicalDeviceSelection* selection, VkSurfaceKHR surface);
 uint32_t get_device_type_score(VkPhysicalDeviceType type);
 bool select_physical_device(RendererState* state);

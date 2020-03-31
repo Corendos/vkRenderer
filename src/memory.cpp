@@ -210,12 +210,15 @@ bool allocate_from_chunk(MemoryManager* manager, MemoryPool* pool, MemoryChunk* 
 	return true;
     }
 
-    std::cout << "**** ERROR ****" << std::endl;
+    // @Note: maybe we should assert that when we come to this portion we are not in the case where the children have just been created ?
 
-    return false; // This should not happen because it means the two children are full and the current chunk full flag should be set
+    return false; // In the case where two children tree already exist and we've not found a suitable location.
 }
 
 void free(MemoryManager* manager, AllocatedMemoryChunk* allocated_chunk) {
+    if (!allocated_chunk) return;
+    if (!allocated_chunk->device_memory) return;
+
     MemoryPool* pool = manager->pools[allocated_chunk->memory_type];
     while (pool) {
 	if (pool->device_memory == allocated_chunk->device_memory) {

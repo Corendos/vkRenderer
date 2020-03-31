@@ -5,6 +5,9 @@
 #include <cstring>
 
 #include "hash.hpp"
+#include "macros.hpp"
+#include "vk_helper.hpp"
+#include "utils.hpp"
 
 uint32_t get_file_size(FILE* file) {
     uint32_t size = 0;
@@ -28,12 +31,9 @@ void copy_file_to(FILE* file, char* dest, uint32_t file_size = 0) {
 }
 
 bool load_shader_code(const char* filename, uint32_t** code, uint32_t* code_size) {
-    assert(sizeof(filename) + 1 + sizeof(PROGRAM_ROOT) < 256);
     char full_filename[256] = {0};
-
-    strcpy(full_filename, PROGRAM_ROOT);
-    full_filename[sizeof(PROGRAM_ROOT) - 1] = '/';
-    strcpy(full_filename + sizeof(PROGRAM_ROOT), filename);
+    // @Warning: this is unchecked
+    get_full_path_from_root(filename, full_filename);
 
     FILE* file = fopen(full_filename, "rb");
 
@@ -55,7 +55,7 @@ bool load_shader_code(const char* filename, uint32_t** code, uint32_t* code_size
 }
 
 void free_shader_code(uint32_t* code) {
-    free(code);
+    free_null(code);
 }
 
 bool create_shader_module(VkDevice device, const char* filename, VkShaderModule* module) {
@@ -63,7 +63,7 @@ bool create_shader_module(VkDevice device, const char* filename, VkShaderModule*
     uint32_t* code = 0;
 
     if (!load_shader_code(filename, &code, &code_size)) {
-	free(code);
+	free_null(code);
 	return false;
     }
 
@@ -74,11 +74,12 @@ bool create_shader_module(VkDevice device, const char* filename, VkShaderModule*
 
     VkResult result = vkCreateShaderModule(device, &create_info, nullptr, module);
     if (result != VK_SUCCESS) {
-	free(code);
+	std::cout << "vkCreateShaderModule returned (" << vk_error_code_str(result) << ")" << std::endl;
+	free_null(code);
 	return false;
     }
 
-    free(code);
+    free_null(code);
     return true;
 }
 
@@ -143,6 +144,6 @@ void cleanup_shader_catalog(VkDevice device, ShaderCatalog* catalog, bool verbos
 	    }
 	}
 
-	free(catalog->modules);
+	free_null(catalog->modules);
     }
 }

@@ -13,6 +13,68 @@ std::string extract_version(uint32_t version) {
     return std::to_string(VK_VERSION_MAJOR(version)) + "." + std::to_string(VK_VERSION_MINOR(version)) + "." + std::to_string(VK_VERSION_PATCH(version));
 }
 
+const char* vk_error_code_str(VkResult result) {
+    switch (result) {
+      case VK_SUCCESS:
+	return "VK_SUCCESS";
+	break;
+      case VK_NOT_READY:
+	return "VK_NOT_READY";
+	break;
+      case VK_TIMEOUT:
+	return "VK_TIMEOUT";
+	break;
+      case VK_EVENT_SET:
+	return "VK_EVENT_SET";
+	break;
+      case VK_EVENT_RESET:
+	return "VK_EVENT_RESET";
+	break;
+      case VK_INCOMPLETE:
+	return "VK_INCOMPLETE";
+	break;
+      case VK_ERROR_OUT_OF_HOST_MEMORY:
+	return "VK_ERROR_OUT_OF_HOST_MEMORY";
+	break;
+      case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+	return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+	break;
+      case VK_ERROR_INITIALIZATION_FAILED:
+	return "VK_ERROR_INITIALIZATION_FAILED";
+	break;
+      case VK_ERROR_DEVICE_LOST:
+	return "VK_ERROR_DEVICE_LOST";
+	break;
+      case VK_ERROR_MEMORY_MAP_FAILED:
+	return "VK_ERROR_MEMORY_MAP_FAILED";
+	break;
+      case VK_ERROR_LAYER_NOT_PRESENT:
+	return "VK_ERROR_LAYER_NOT_PRESENT";
+	break;
+      case VK_ERROR_EXTENSION_NOT_PRESENT:
+	return "VK_ERROR_EXTENSION_NOT_PRESENT";
+	break;
+      case VK_ERROR_FEATURE_NOT_PRESENT:
+	return "VK_ERROR_FEATURE_NOT_PRESENT";
+	break;
+      case VK_ERROR_INCOMPATIBLE_DRIVER:
+	return "VK_ERROR_INCOMPATIBLE_DRIVER";
+	break;
+      case VK_ERROR_TOO_MANY_OBJECTS:
+	return "VK_ERROR_TOO_MANY_OBJECTS";
+	break;
+      case VK_ERROR_FORMAT_NOT_SUPPORTED:
+	return "VK_ERROR_FORMAT_NOT_SUPPORTED";
+	break;
+      case VK_ERROR_FRAGMENTED_POOL:
+	return "VK_ERROR_FRAGMENTED_POOL";
+	break;
+      default:
+	return "UNKNOWN";
+	break;
+    }
+}
+
 bool check_queue_availability(PhysicalDeviceSelection* selection, VkSurfaceKHR surface) {
     uint32_t queue_family_property_count = 0;
 
@@ -80,7 +142,7 @@ bool select_physical_device(RendererState* state) {
     VkResult result = vkEnumeratePhysicalDevices(state->instance, &physical_device_count, nullptr);
 
     if (result != VK_SUCCESS) {
-	std::cout << "Problem while querying the physical devices" << std::endl;
+	std::cout << "vkEnumeratePhysicalDevices returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -88,7 +150,7 @@ bool select_physical_device(RendererState* state) {
 
     result = vkEnumeratePhysicalDevices(state->instance, &physical_device_count, physical_devices);
     if (result != VK_SUCCESS) {
-	std::cout << "Problem while querying the physical devices" << std::endl;
+	std::cout << "vkEnumeratePhysicalDevices returned (" << vk_error_code_str(result) << ")" << std::endl;
 	free_null(physical_devices);
 	return false;
     }
@@ -133,7 +195,7 @@ bool select_surface_format(RendererState* state) {
     VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(state->selection.device, state->surface, &surface_format_count, nullptr);
 
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to query surface formats" << std::endl;
+	std::cout << "vkGetPhysicalDeviceSurfaceFormatsKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -141,7 +203,7 @@ bool select_surface_format(RendererState* state) {
 
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(state->selection.device, state->surface, &surface_format_count, surface_formats);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to query surface formats" << std::endl;
+	std::cout << "vkGetPhysicalDeviceSurfaceFormatsKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	free_null(surface_formats);
 	return false;
     }
@@ -182,7 +244,7 @@ bool select_present_mode(RendererState* state) {
     VkResult result = vkGetPhysicalDeviceSurfacePresentModesKHR(state->selection.device, state->surface, &present_mode_count, nullptr);
 
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to query present modes" << std::endl;
+	std::cout << "vkGetPhysicalDeviceSurfacePresentModesKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -190,7 +252,7 @@ bool select_present_mode(RendererState* state) {
 
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(state->selection.device, state->surface, &present_mode_count, present_modes);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to query present modes" << std::endl;
+	std::cout << "vkGetPhysicalDevoceSurfacePresentModesKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	free_null(present_modes);
 	return false;
     }
@@ -216,7 +278,10 @@ bool check_required_layers() {
 
     VkResult result = vkEnumerateInstanceLayerProperties(&layer_property_count, layer_properties);
 
-    if (result != VK_SUCCESS && result != VK_INCOMPLETE) return false;
+    if (result != VK_SUCCESS && result != VK_INCOMPLETE) {
+	std::cout << "vkEnumerateInstanceLayerProperties returned (" << vk_error_code_str(result) << ")" << std::endl;
+	return false;
+    }
 
     for (int j = 0;j < array_size(required_layers);++j) {
 	bool found = false;
@@ -241,6 +306,7 @@ bool check_required_instance_extensions(const char** extensions, uint32_t count)
     VkResult result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_property_count, nullptr);
 
     if (result != VK_SUCCESS) {
+	std::cout << "vkEnumerateInstanceExtensionProperties returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -248,6 +314,7 @@ bool check_required_instance_extensions(const char** extensions, uint32_t count)
     result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_property_count, extension_properties);
 
     if (result != VK_SUCCESS) {
+	std::cout << "vkEnumerateInstanceExtensionProperties returned (" << vk_error_code_str(result) << ")" << std::endl;
 	free_null(extension_properties);
 	return false;
     }
@@ -276,6 +343,7 @@ bool check_required_device_extensions(VkPhysicalDevice physical_device) {
     VkResult result = vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_property_count, nullptr);
 
     if (result != VK_SUCCESS) {
+	std::cout << "vkEnumerateDeviceExtensionProperties returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -283,6 +351,7 @@ bool check_required_device_extensions(VkPhysicalDevice physical_device) {
     result = vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_property_count, extension_properties);
 
     if (result != VK_SUCCESS) {
+	std::cout << "vkEnumerateDeviceExtensionProperties returned (" << vk_error_code_str(result) << ")" << std::endl;
 	free_null(extension_properties);
 	return false;
     }
@@ -308,8 +377,9 @@ bool check_required_device_extensions(VkPhysicalDevice physical_device) {
 
 bool create_instance(VkInstance* instance) {
     uint32_t version;
-    if (vkEnumerateInstanceVersion(&version) != VK_SUCCESS) {
-	std::cout << "Failed to get instance version" << std::endl;
+    VkResult result = vkEnumerateInstanceVersion(&version);
+    if (result != VK_SUCCESS) {
+	std::cout << "vkEnumerateInstanceVersion returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     };
 
@@ -334,10 +404,10 @@ bool create_instance(VkInstance* instance) {
     instance_create_info.enabledExtensionCount = extension_count;
     instance_create_info.ppEnabledExtensionNames = required_instance_extensions;
 
-    VkResult result = vkCreateInstance(&instance_create_info, nullptr, instance);
+    result = vkCreateInstance(&instance_create_info, nullptr, instance);
 
     if (result != VK_SUCCESS) {
-	std::cout << "Failed to create instance" << std::endl;
+	std::cout << "vkCreateInstance returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -384,6 +454,7 @@ bool create_device_and_queues(RendererState* state) {
     VkResult result = vkCreateDevice(state->selection.device, &device_create_info, nullptr, &state->device);
 
     if (result != VK_SUCCESS) {
+	std::cout << "vkCreateDevice returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -400,7 +471,7 @@ bool create_swapchain(RendererState* state) {
 
     VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(state->selection.device, state->surface, &surface_capabilities);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to get surface capabilities" << std::endl;
+	std::cout << "vkGetPhysicalDeviceSurfaceCapabilitiesKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -440,7 +511,7 @@ bool create_swapchain(RendererState* state) {
 
     result = vkCreateSwapchainKHR(state->device, &swapchain_create_info, nullptr, &new_swapchain);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to create swapchain (error code: " << result << ")" << std::endl;
+	std::cout << "vkCreateSwapchainKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -457,7 +528,7 @@ bool get_swapchain_images(RendererState* state) {
     state->swapchain_image_count = 0;
     VkResult result = vkGetSwapchainImagesKHR(state->device, state->swapchain, &state->swapchain_image_count, nullptr);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to get the swapchain image handles" << std::endl;
+	std::cout << "vkGetSwapchainImagesKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -465,7 +536,7 @@ bool get_swapchain_images(RendererState* state) {
 
     result = vkGetSwapchainImagesKHR(state->device, state->swapchain, &state->swapchain_image_count, state->swapchain_images);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to get the swapchain image handles" << std::endl;
+	std::cout << "vkGetSwapchainImagesKHR returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -494,7 +565,7 @@ bool create_swapchain_image_views(RendererState* state) {
 	create_info.image = state->swapchain_images[i];
 	VkResult result = vkCreateImageView(state->device, &create_info, nullptr, &state->swapchain_image_views[i]);
 	if (result != VK_SUCCESS) {
-	    std::cout << "Error: failed to create swapchain image view" << std::endl;
+	    std::cout << "vkCreateImageView returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
     }
@@ -523,6 +594,7 @@ bool create_depth_image_views(RendererState* state) {
 
 	VkResult result = vkCreateImageView(state->device, &create_info, nullptr, &state->depth_image_views[i]);
 	if (result != VK_SUCCESS) {
+	    std::cout << "vkCreateImageView returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    free_null(state->depth_image_views);
 	    return false;
 	}
@@ -553,6 +625,7 @@ bool create_depth_images(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
 	VkResult result = vkCreateImage(state->device, &create_info, nullptr, &state->depth_images[i]);
 	if (result != VK_SUCCESS) {
+	    std::cout << "vkCreateImage returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    free_null(state->depth_images);
 	    return false;
 	}
@@ -573,6 +646,7 @@ bool create_depth_images(RendererState* state) {
 
 	VkResult result = vkBindImageMemory(state->device, state->depth_images[i], state->depth_image_allocations[i].device_memory, state->depth_image_allocations[i].offset);
 	if (result != VK_SUCCESS) {
+	    std::cout << "vkBindImageMemory returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    free_null(state->depth_image_allocations);
 	    return false;
 	}
@@ -595,7 +669,7 @@ bool create_semaphore(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
 	VkResult result = vkCreateSemaphore(state->device, &create_info, nullptr, &state->present_semaphores[i]);
 	if (result != VK_SUCCESS) {
-	    std::cout << "Error: failed to create semaphore" << std::endl;
+	    std::cout << "vkCreateSemaphore returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
     }
@@ -603,7 +677,7 @@ bool create_semaphore(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
 	VkResult result = vkCreateSemaphore(state->device, &create_info, nullptr, &state->acquire_semaphores[i]);
 	if (result != VK_SUCCESS) {
-	    std::cout << "Error: failed to create semaphore" << std::endl;
+	    std::cout << "vkCreateSemaphore returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
     }
@@ -621,7 +695,7 @@ bool create_fence(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
 	VkResult result = vkCreateFence(state->device, &create_info, nullptr, &state->fences[i]);
 	if (result != VK_SUCCESS) {
-	    std::cout << "Error: failed to create fence" << std::endl;
+	    std::cout << "vkCreateFence returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
 	state->submissions[i].fence = &state->fences[i];
@@ -639,7 +713,7 @@ bool create_command_pool(RendererState* state) {
 
     VkResult result = vkCreateCommandPool(state->device, &create_info, nullptr, &state->command_pool);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to create command pool" << std::endl;
+	std::cout << "vkCreateCommandPool returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -662,6 +736,7 @@ bool create_descriptor_set_layout(RendererState* state) {
     VkResult result = vkCreateDescriptorSetLayout(state->device, &create_info, nullptr, &state->descriptor_set_layouts[CameraDescriptorSetLayout]);
 
     if (result != VK_SUCCESS) {
+	std::cout << "vkCreateDescriptorSetLayout returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -679,6 +754,7 @@ bool create_descriptor_set_layout(RendererState* state) {
     result = vkCreateDescriptorSetLayout(state->device, &create_info, nullptr, &state->descriptor_set_layouts[TransformDescriptorSetLayout]);
 
     if (result != VK_SUCCESS) {
+	std::cout << "vkCreateDescriptorSetLayout returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -693,7 +769,7 @@ bool create_pipeline_layout(RendererState* state) {
 
     VkResult result = vkCreatePipelineLayout(state->device, &create_info, nullptr, &state->pipeline_layout);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to create pipeline layout" << std::endl;
+	std::cout << "vkCreatePipelineLayout returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -758,7 +834,7 @@ bool create_render_pass(RendererState* state) {
 
     VkResult result = vkCreateRenderPass(state->device, &create_info, nullptr, &state->renderpass);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to create render pass" << std::endl;
+	std::cout << "vkCreateRenderPass returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -883,7 +959,7 @@ bool create_graphics_pipeline(RendererState* state) {
 
     VkResult result = vkCreateGraphicsPipelines(state->device, VK_NULL_HANDLE, 1, &create_info, nullptr, &state->pipeline);
     if (result != VK_SUCCESS) {
-	std::cout << "Error: failed to create graphics pipeline" << std::endl;
+	std::cout << "vkCreateGraphicsPipelines returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
@@ -907,7 +983,7 @@ bool create_framebuffers(RendererState* state) {
 
 	VkResult result = vkCreateFramebuffer(state->device, &create_info, nullptr, &state->framebuffers[i]);
 	if (result != VK_SUCCESS) {
-	    std::cout << "Error: failed to create framebuffer" << std::endl;
+	    std::cout << "vkCreateFramebuffer returned (" << vk_error_code_str(result) << ")" << std::endl;
 	    return false;
 	}
     }
@@ -930,6 +1006,7 @@ bool create_descriptor_pool(RendererState* state) {
 
     VkResult result = vkCreateDescriptorPool(state->device, &create_info, nullptr, &state->descriptor_pool);
     if (result != VK_SUCCESS) {
+	std::cout << "vkCreateDescriptorPool returned (" << vk_error_code_str(result) << ")" << std::endl;
 	return false;
     }
 
