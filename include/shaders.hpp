@@ -1,8 +1,7 @@
 #ifndef __SHADERS_HPP__
 #define __SHADERS_HPP__
 
-#include <cstdint>
-#include <cstdio>
+#include <stdint.h>
 
 #include <vulkan/vulkan.h>
 

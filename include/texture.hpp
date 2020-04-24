@@ -1,7 +1,7 @@
 #ifndef __TEXTURE_HPP__
 #define __TEXTURE_HPP__
 
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan.h>
 #include "memory.hpp"
 
 struct RendererState;
@@ -17,7 +17,7 @@ struct Texture {
 struct TextureCatalog {
     Texture* textures;
     uint32_t count;
-
+    
     VkBuffer staging_buffer;
     AllocatedMemoryChunk allocation;
     VkCommandPool command_pool;

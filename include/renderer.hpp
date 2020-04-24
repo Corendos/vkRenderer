@@ -9,10 +9,15 @@
 #include "memory.hpp"
 #include "math.hpp"
 #include "camera.hpp"
+#include "gui.hpp"
 
 #define MAX_ENTITY_COUNT 1024
 
-enum DescriptorSetLayoutName { CameraDescriptorSetLayout, TransformDescriptorSetLayout, CountDescriptorSetLayout };
+enum DescriptorSetLayoutName {
+    CameraDescriptorSetLayout,
+    TransformDescriptorSetLayout,
+    CountDescriptorSetLayout
+};
 
 struct PhysicalDeviceSelection {
     VkPhysicalDevice device;
@@ -27,22 +32,9 @@ struct CommandBufferSubmission {
     VkFence* fence;
 };
 
-
 struct Vertex {
     Vec3f position;
     Vec3f color;
-};
-
-struct SquareEntity {
-    VkDescriptorSet descriptor_set;
-    VkBuffer buffer;
-    AllocatedMemoryChunk allocation;
-};
-
-struct CubeEntity {
-    VkDescriptorSet descriptor_set;
-    VkBuffer buffer;
-    AllocatedMemoryChunk allocation;
 };
 
 struct Entity {
@@ -51,7 +43,7 @@ struct Entity {
     AllocatedMemoryChunk allocation;
     uint32_t size;
     uint32_t offset;
-
+    
     Mat4f *transform;
 };
 
@@ -80,6 +72,7 @@ struct RendererState {
     VkImageView* swapchain_image_views;
     VkExtent2D swapchain_extent;
     bool crashed;
+    bool skip_image;
     VkSemaphore* present_semaphores;
     VkSemaphore* acquire_semaphores;
     VkFence* fences;
@@ -89,25 +82,29 @@ struct RendererState {
     VkDescriptorPool descriptor_pool;
     VkRenderPass renderpass;
     VkPipeline pipeline;
+    VkPipeline gui_pipeline;
     VkImage* depth_images;
     AllocatedMemoryChunk* depth_image_allocations;
     VkImageView* depth_image_views;
     VkFramebuffer* framebuffers;
-
+    
     Camera camera;
     CameraResources camera_resources;
-
+    
     CommandBufferSubmission* submissions;
-
+    
     uint32_t last_image_index;
     uint32_t image_index;
     ShaderCatalog shader_catalog;
     MemoryManager memory_manager;
-
+    
     TextureCatalog texture_catalog;
-
+    
     bool cursor_locked;
-
+    
+    GuiState gui_state;
+    GuiResources gui_resources;
+    
     Entity entities[MAX_ENTITY_COUNT];
     EntityResources entity_resources;
     uint32_t entity_count;

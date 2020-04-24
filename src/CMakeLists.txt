@@ -13,7 +13,7 @@ file(
 set(CURRENT_PROJECT ${CMAKE_PROJECT_NAME})
 
 # Declare executable
-add_executable(${CURRENT_PROJECT} ${src})
+add_executable(${CURRENT_PROJECT} main.cpp)
 
 # Include local include files
 target_include_directories(${CURRENT_PROJECT} PUBLIC ${PROJECT_SOURCE_DIR}/include)
@@ -39,12 +39,8 @@ set_target_properties(${CURRENT_PROJECT}
 
 add_definitions(-DPROGRAM_ROOT="${PROJECT_SOURCE_DIR}")
 
-add_custom_command(
-	TARGET ${CURRENT_PROJECT} PRE_BUILD
-	COMMAND glslc
-	ARGS ${PROJECT_SOURCE_DIR}/resources/shaders/basic.vert -o ${PROJECT_SOURCE_DIR}/resources/shaders/basic.vert.spv)
-
-add_custom_command(
-	TARGET ${CURRENT_PROJECT} PRE_BUILD
-	COMMAND glslc
-	ARGS ${PROJECT_SOURCE_DIR}/resources/shaders/basic.frag -o ${PROJECT_SOURCE_DIR}/resources/shaders/basic.frag.spv)
+add_custom_target(shaders
+	glslc ${PROJECT_SOURCE_DIR}/resources/shaders/basic.vert -o ${PROJECT_SOURCE_DIR}/resources/shaders/basic.vert.spv
+	COMMAND glslc ${PROJECT_SOURCE_DIR}/resources/shaders/basic.frag -o ${PROJECT_SOURCE_DIR}/resources/shaders/basic.frag.spv
+	COMMAND glslc ${PROJECT_SOURCE_DIR}/resources/shaders/gui.vert -o ${PROJECT_SOURCE_DIR}/resources/shaders/gui.vert.spv
+	COMMAND glslc ${PROJECT_SOURCE_DIR}/resources/shaders/gui.frag -o ${PROJECT_SOURCE_DIR}/resources/shaders/gui.frag.spv)

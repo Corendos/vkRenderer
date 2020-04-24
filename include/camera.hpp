@@ -1,6 +1,9 @@
 #ifndef __CAMERA_HPP__
 #define __CAMERA_HPP__
 
+#include "math.hpp"
+#include "memory.hpp"
+
 struct CameraContext {
     Mat4f projection;
     Mat4f view;
@@ -16,12 +19,12 @@ struct Camera {
     Vec3f position;
     float aspect;
     float fov;
-
+    
     float yaw;
     float pitch;
-
+    
     float speed;
-
+    
     CameraContext context;
 };
 

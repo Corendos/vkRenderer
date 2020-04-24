@@ -1,9 +1,7 @@
 #include "utils.hpp"
 
-#include <cstring>
+#include <string.h>
 
 void get_full_path_from_root(const char* filename, char* output) {
-    strcpy(output, PROGRAM_ROOT);
-    output[sizeof(PROGRAM_ROOT) - 1] = '/';
-    strcpy(output + sizeof(PROGRAM_ROOT), filename);
+    sprintf(output, "%s/%s", PROGRAM_ROOT, filename);
 }
