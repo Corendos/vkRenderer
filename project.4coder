@@ -1,0 +1,137 @@
+version(1);
+
+project_name = "vkRenderer";
+
+patterns = {
+	"*.c",
+	"*.cpp",
+	"*.h",
+	"*.hpp",
+	"*.m",
+	"*.bat",
+	"*.sh",
+	"*.4coder",
+};
+
+blacklist_patterns = {
+	".*",
+	"*build/*",
+	".git/*",
+	".vscode/*"
+};
+
+load_paths_base = {
+	{
+		"./src/",
+		.relative = true,
+		.recursive = true,
+	},
+	{
+		"./include/",
+		.relative = true,
+		.recursive = true,
+	},
+};
+
+load_paths = {
+	{
+		load_paths_base,
+		.os = "win",
+	},
+	{
+		load_paths_base,
+		.os = "linux",
+	},
+	{
+		load_paths_base,
+		.os = "mac",
+	},
+};
+
+command_list = {
+	{
+		.name = "Build Debug",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cmd = {
+			{
+				"build_debug.bat" ,
+				.os = "win"
+			},
+            {
+				"./build_debug.sh",
+				.os = "linux"
+			},
+            {
+				"./build_debug.sh",
+				.os = "mac"
+			},
+		},
+	},
+	{
+		.name = "Build Release",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cmd = {
+			{
+				"./build_release.bat" ,
+				.os = "win"
+			},
+            {
+				"./build_release.sh",
+				.os = "linux"
+			},
+            {
+				"./build_release.sh",
+				.os = "mac"
+			},
+		},
+	},
+	{
+		.name = "Run Debug",
+		.out = "*run*",
+		.footer_panel = false,
+		.save_dirty_files = false,
+		.cmd = {
+			{
+				"./bin/Debug/vk_renderer",
+				.os = "win"
+			},
+            {
+				"./bin/Debug/vk_renderer",
+				.os = "linux"
+			},
+            {
+				"./bin/Debug/vk_renderer",
+				.os = "mac"
+			},
+		},
+	},
+	{
+		.name = "Run Release",
+		.out = "*run*",
+		.footer_panel = false,
+		.save_dirty_files = false,
+		.cmd = {
+			{
+				"./bin/Debug/vk_renderer",
+				.os = "win"
+			},
+            {
+				"./bin/Debug/vk_renderer",
+				.os = "linux"
+			},
+            {
+				"./bin/Debug/vk_renderer",
+				.os = "mac"
+			},
+		},
+	},
+};
+
+fkey_command[1] = "Build Debug";
+fkey_command[2] = "Run Debug";
+fkey_command[3] = "Build Release";
+fkey_command[4] = "Run Release";
