@@ -108,8 +108,8 @@ Vec2f screen_space_to_normalized_space(Vec2f screen_size, float x, float y) {
     return result;
 }
 
-void draw_rectangle(GuiState* state, float top, float left, float bottom, float right, Vec3f color) {
-    assert(state->current_size < MAX_GUI_VERTEX_COUNT);
+void draw_rectangle(GuiState* state, float top, float left, float bottom, float right, Vec4f color) {
+    assert(state->current_size + 6 <= MAX_GUI_VERTEX_COUNT);
     
     GuiVertex bottom_left_vertex = {};
     bottom_left_vertex.position  = screen_space_to_normalized_space(state->screen_size, left, bottom);
@@ -134,4 +134,42 @@ void draw_rectangle(GuiState* state, float top, float left, float bottom, float 
     state->vertex_buffer[state->current_size++] = bottom_left_vertex;
     state->vertex_buffer[state->current_size++] = top_right_vertex;
     state->vertex_buffer[state->current_size++] = bottom_right_vertex;
+}
+
+bool draw_button(GuiState* state, Input* input, bool button_state, float top, float left, float bottom, float right, Vec4f color, Vec4f hover_color, Vec4f active_color) {
+    bool inside = input->mouse_x >= left &&
+        input->mouse_x <= right &&
+        input->mouse_y >= top &&
+        input->mouse_y <= bottom;
+    
+    if (button_state) {
+        draw_rectangle(state, top, left, bottom, right, active_color);
+    } else if (inside) {
+        draw_rectangle(state, top, left, bottom, right, hover_color);
+    } else {
+        draw_rectangle(state, top, left, bottom, right, color);
+    }
+    return (button_state && input->button_pressed[GLFW_MOUSE_BUTTON_LEFT]) || (inside && input->button_pressed[GLFW_MOUSE_BUTTON_LEFT]);
+}
+
+char* to_string(GuiState* state, TemporaryStorage* temporary_storage, uint32_t indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (uint32_t i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 10000);
+    
+    sprintf(str,
+            "GuiState {\n"
+            "%s    vertex_buffer: %p\n"
+            "%s    current_size: %d\n"
+            "%s    screen_size: %s\n"
+            "%s}",
+            indent_space, state->vertex_buffer,
+            indent_space, state->current_size,
+            indent_space, to_string(state->screen_size, temporary_storage, indentation_level + 4),
+            indent_space);
+    
+    return str;
 }

@@ -10,6 +10,7 @@
 #include "math.hpp"
 #include "camera.hpp"
 #include "gui.hpp"
+#include "temporary_storage.hpp"
 
 #define MAX_ENTITY_COUNT 1024
 
@@ -108,6 +109,9 @@ struct RendererState {
     Entity entities[MAX_ENTITY_COUNT];
     EntityResources entity_resources;
     uint32_t entity_count;
+    
+    bool button_state[4];
+    TemporaryStorage temporary_storage;
 };
 
 #endif

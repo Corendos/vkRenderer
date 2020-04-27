@@ -7,39 +7,41 @@
 #define PI_4 PI / 4
 #define PI_6 PI / 6
 
+#include "temporary_storage.hpp"
+
 struct Vec2f {
     union {
-	struct { float x; float y; };
-	struct { float r; float g; };
-	float v[2];
+        struct { float x; float y; };
+        struct { float r; float g; };
+        float v[2];
     };
 };
 
 struct Vec3f {
     union {
-	struct { float x; float y; float z; };
-	struct { float r; float g; float b; };
-	float v[3];
+        struct { float x; float y; float z; };
+        struct { float r; float g; float b; };
+        float v[3];
     };
 };
 
 struct Vec4f {
     union {
-	struct { float x; float y; float z; float w; };
-	struct { float r; float g; float b; float a; };
-	float v[4];
+        struct { float x; float y; float z; float w; };
+        struct { float r; float g; float b; float a; };
+        float v[4];
     };
 };
 
 struct Mat4f {
     union {
-	struct {
-	    float m00; float m10; float m20; float m30;
-	    float m01; float m11; float m21; float m31;
-	    float m02; float m12; float m22; float m32;
-	    float m03; float m13; float m23; float m33;
-	};
-	float v[16];
+        struct {
+            float m00; float m10; float m20; float m30;
+            float m01; float m11; float m21; float m31;
+            float m02; float m12; float m22; float m32;
+            float m03; float m13; float m23; float m33;
+        };
+        float v[16];
     };
 };
 
@@ -48,9 +50,9 @@ Vec3f new_vec3f(float x = 0.0f, float y = 0.0f, float z = 0.0f);
 Vec4f new_vec4f(float x = 0.0f, float y = 0.0f, float z = 0.0f, float w = 0.0f);
 
 Mat4f new_mat4f(float m00, float m01, float m02, float m03,
-		float m10, float m11, float m12, float m13,
-		float m20, float m21, float m22, float m23,
-		float m30, float m31, float m32, float m33);
+                float m10, float m11, float m12, float m13,
+                float m20, float m21, float m22, float m23,
+                float m30, float m31, float m32, float m33);
 
 Mat4f identity_mat4f();
 Mat4f perspective(float fov, float aspect, float near, float far);
@@ -94,5 +96,9 @@ Mat4f operator*(Mat4f& m1, Mat4f& m2);
 
 float clamp(float value, float a, float b);
 float randf();
+
+char* to_string(Vec2f v, TemporaryStorage* temporary_storage, uint32_t indentation_level = 0);
+char* to_string(Vec3f v, TemporaryStorage* temporary_storage, uint32_t indentation_level = 0);
+char* to_string(Vec4f v, TemporaryStorage* temporary_storage, uint32_t indentation_level = 0);
 
 #endif

@@ -327,3 +327,70 @@ float clamp(float value, float a, float b) {
 float randf() {
     return (float)rand() / (float)RAND_MAX;
 }
+
+
+char* to_string(Vec2f v, TemporaryStorage* temporary_storage, uint32_t indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (uint32_t i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %06.6f\n"
+            "%s    y: %06.6f\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space);
+    
+    return str;
+}
+
+char* to_string(Vec3f v, TemporaryStorage* temporary_storage, uint32_t indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (uint32_t i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %06.6f\n"
+            "%s    y: %06.6f\n"
+            "%s    z: %06.6f\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space, v.z,
+            indent_space);
+    
+    return str;
+}
+
+char* to_string(Vec4f v, TemporaryStorage* temporary_storage, uint32_t indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (uint32_t i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %06.6f\n"
+            "%s    y: %06.6f\n"
+            "%s    z: %06.6f\n"
+            "%s    w: %06.6f\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space, v.z,
+            indent_space, v.w,
+            indent_space);
+    
+    return str;
+}

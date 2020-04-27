@@ -10,6 +10,7 @@
 #include "stb_image.h"
 
 #include "camera.hpp"
+#include "color.hpp"
 #include "gui.hpp"
 #include "hash.hpp"
 #include "input.hpp"
@@ -17,6 +18,7 @@
 #include "memory.hpp"
 #include "renderer.hpp"
 #include "shaders.hpp"
+#include "temporary_storage.hpp"
 #include "texture.hpp"
 #include "timer.hpp"
 #include "utils.hpp"
@@ -24,12 +26,14 @@
 #include "window.hpp"
 #include "window_user_data.hpp"
 
+#include "color.cpp"
 #include "gui.cpp"
 #include "hash.cpp"
 #include "input.cpp"
 #include "math.cpp"
 #include "memory.cpp"
 #include "shaders.cpp"
+#include "temporary_storage.cpp"
 #include "texture.cpp"
 #include "timer.cpp"
 #include "utils.cpp"
@@ -608,6 +612,13 @@ bool init_entities(RendererState* state) {
 }
 
 bool init(RendererState* state, WindowUserData* window_user_data) {
+    if (!init_temporary_storage(&state->temporary_storage)) {
+        printf("Error: failed to initialize temporary_storage\n");
+        return false;
+    } else {
+        printf("temporary_storage init : success\n");
+    }
+    
     if (!glfwInit()) {
         printf("Error: failed to initialize glfw library\n");
         return false;
@@ -922,30 +933,44 @@ void update_entities(RendererState* state) {
     memcpy(state->entity_resources.allocations[state->image_index].data, state->entity_resources.transforms, state->entity_count * sizeof(Mat4f));
 }
 
-void update(RendererState* state, Input* input, Time* time) {
+void update_gui(RendererState* state, Input* input) {
     reset_gui(&state->gui_state);
     
-    int baseOffset = 1;
-    int size = 3;
+    uint32_t button_height = 40;
+    uint32_t button_width  = 200;
     
-    int currentYOffset = baseOffset;
-    int currentXOffset = baseOffset;
+    uint32_t y_offset = button_height + 10;
+    uint32_t current_offset = 10;
     
-    for (int i = 0;i < 10000;++i) {
-        draw_rectangle(&state->gui_state, currentYOffset, currentXOffset, currentYOffset + size, currentXOffset + size, new_vec3f((float)i / 10000.0f, (float)i / 20000.0f, (float)i / 10000.0f));
-        currentYOffset += size + 1;
-        if (currentYOffset > state->swapchain_extent.height) {
-            currentYOffset = baseOffset;
-            currentXOffset += size + 1;
+    for (uint32_t i = 0;i < 4;++i) {
+        bool button_pressed = draw_button(&state->gui_state, input,
+                                          state->button_state[i],
+                                          current_offset, 10,
+                                          current_offset + button_height, 10 + button_width,
+                                          new_coloru(255, 0, 0, 127),
+                                          new_coloru(255, 77, 77, 127),
+                                          new_coloru(128, 0, 0, 127));
+        if(button_pressed) {
+            state->button_state[i] = true;
+        } else {
+            if (state->button_state[i]) {
+                printf("Pressed the button %d !\n", i);
+            }
+            state->button_state[i] = false;
         }
+        
+        current_offset += y_offset;
     }
-    memcpy(state->gui_resources.allocations[state->image_index].data, state->gui_state.vertex_buffer, state->gui_state.current_size * sizeof(GuiVertex));
     
+    memcpy(state->gui_resources.allocations[state->image_index].data, state->gui_state.vertex_buffer, state->gui_state.current_size * sizeof(GuiVertex));
+}
+
+void update(RendererState* state, Input* input, Time* time) {
+    update_gui(state, input);
     update_time(time);
     update_camera(state, input, time);
     update_entities(state);
     memcpy(state->camera_resources.allocations[state->image_index].data, &state->camera.context, sizeof(CameraContext));
-    
     
     if (input->button_just_pressed[GLFW_MOUSE_BUTTON_RIGHT]) {
         state->cursor_locked = !state->cursor_locked;
@@ -1071,6 +1096,7 @@ VkResult render(RendererState* state) {
 
 
 void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time) {
+    reset(&state->temporary_storage);
     if (!handle_swapchain_recreation(state, window_user_data)) {
         state->crashed = true;
         return;
@@ -1195,6 +1221,7 @@ void cleanup(RendererState* state) {
     destroy_device(state, true);
     destroy_surface(state, true);
     destroy_instance(state, true);
+    destroy_temporary_storage(&state->temporary_storage, true);
 }
 
 int main() {

@@ -6,12 +6,13 @@
 
 #include "math.hpp"
 #include "memory.hpp"
+#include "temporary_storage.hpp"
 
 struct RendererState;
 
 struct GuiVertex {
     Vec2f position;
-    Vec3f color;
+    Vec4f color;
 };
 
 struct GuiState {
@@ -30,6 +31,8 @@ bool init_gui(GuiState* gui_state, GuiResources* resources, RendererState* state
 void reset_gui(GuiState* state);
 void cleanup_gui(GuiState* state, GuiResources* resources, RendererState* renderer_state, bool verbose = false);
 
-void draw_rectangle(GuiState* state, float top, float left, float bottom, float right, Vec3f color);
+void draw_rectangle(GuiState* state, float top, float left, float bottom, float right, Vec4f color);
+
+char* to_string(GuiState* state, TemporaryStorage* storage, uint32_t indentation_level = 0);
 
 #endif

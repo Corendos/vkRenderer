@@ -874,7 +874,7 @@ bool create_gui_graphics_pipeline(RendererState* state) {
     
     attribute_description[1].location = 1;
     attribute_description[1].binding = 0;
-    attribute_description[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_description[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
     attribute_description[1].offset = offsetof(GuiVertex, color);
     
     VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {};
