@@ -77,7 +77,7 @@ const char* vk_error_code_str(VkResult result) {
 }
 
 bool check_queue_availability(PhysicalDeviceSelection* selection, VkSurfaceKHR surface) {
-    uint32_t queue_family_property_count = 0;
+    u32 queue_family_property_count = 0;
     
     vkGetPhysicalDeviceQueueFamilyProperties(selection->device, &queue_family_property_count, nullptr);
     
@@ -127,7 +127,7 @@ bool check_queue_availability(PhysicalDeviceSelection* selection, VkSurfaceKHR s
 }
 
 
-uint32_t get_device_type_score(VkPhysicalDeviceType type) {
+u32 get_device_type_score(VkPhysicalDeviceType type) {
     switch (type) {
         case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
         return 10;
@@ -139,7 +139,7 @@ uint32_t get_device_type_score(VkPhysicalDeviceType type) {
 }
 
 bool select_physical_device(RendererState* state) {
-    uint32_t physical_device_count = 0;
+    u32 physical_device_count = 0;
     VkResult result = vkEnumeratePhysicalDevices(state->instance, &physical_device_count, nullptr);
     
     if (result != VK_SUCCESS) {
@@ -156,7 +156,7 @@ bool select_physical_device(RendererState* state) {
         return false;
     }
     
-    uint32_t selected_device_score = 0;
+    u32 selected_device_score = 0;
     
     for (int i = 0;i < physical_device_count;++i) {
         PhysicalDeviceSelection current_selection = {};
@@ -166,7 +166,7 @@ bool select_physical_device(RendererState* state) {
         VkPhysicalDeviceProperties properties = {};
         vkGetPhysicalDeviceProperties(physical_devices[i], &properties);
         
-        uint32_t score = get_device_type_score(properties.deviceType);
+        u32 score = get_device_type_score(properties.deviceType);
         if (score > selected_device_score) {
             selected_device_score = score;
             state->selection = current_selection;
@@ -177,8 +177,8 @@ bool select_physical_device(RendererState* state) {
     return selected_device_score > 0;
 }
 
-uint32_t get_surface_format_score(VkSurfaceFormatKHR surface_format) {
-    uint32_t score = 0;
+u32 get_surface_format_score(VkSurfaceFormatKHR surface_format) {
+    u32 score = 0;
     switch (surface_format.format) {
         case VK_FORMAT_B8G8R8A8_UNORM:
         score = 10;
@@ -192,7 +192,7 @@ uint32_t get_surface_format_score(VkSurfaceFormatKHR surface_format) {
 }
 
 bool select_surface_format(RendererState* state) {
-    uint32_t surface_format_count = 0;
+    u32 surface_format_count = 0;
     VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(state->selection.device, state->surface, &surface_format_count, nullptr);
     
     if (result != VK_SUCCESS) {
@@ -209,10 +209,10 @@ bool select_surface_format(RendererState* state) {
         return false;
     }
     
-    uint32_t selection_score = 0;
+    u32 selection_score = 0;
     
     for (int i = 0;i < surface_format_count;++i) {
-        uint32_t score = get_surface_format_score(surface_formats[i]);
+        u32 score = get_surface_format_score(surface_formats[i]);
         if (score > selection_score) {
             selection_score = score;
             state->surface_format = surface_formats[i];
@@ -223,17 +223,20 @@ bool select_surface_format(RendererState* state) {
     return selection_score > 0;
 }
 
-uint32_t get_present_mode_score(VkPresentModeKHR present_mode) {
-    uint32_t score = 0;
+u32 get_present_mode_score(VkPresentModeKHR present_mode) {
+    u32 score = 0;
     switch (present_mode) {
         case VK_PRESENT_MODE_IMMEDIATE_KHR:
         score = 10;
         break;
         case VK_PRESENT_MODE_MAILBOX_KHR:
-        score = 30;
+        score = 20;
         break;
         case VK_PRESENT_MODE_FIFO_KHR:
-        score = 20;
+        score = 30;
+        break;
+        case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
+        score = 35;
         break;
     }
     
@@ -241,7 +244,7 @@ uint32_t get_present_mode_score(VkPresentModeKHR present_mode) {
 }
 
 bool select_present_mode(RendererState* state) {
-    uint32_t present_mode_count = 0;
+    u32 present_mode_count = 0;
     VkResult result = vkGetPhysicalDeviceSurfacePresentModesKHR(state->selection.device, state->surface, &present_mode_count, nullptr);
     
     if (result != VK_SUCCESS) {
@@ -258,10 +261,10 @@ bool select_present_mode(RendererState* state) {
         return false;
     }
     
-    uint32_t selection_score = 0;
+    u32 selection_score = 0;
     
     for (int i = 0;i < present_mode_count;++i) {
-        uint32_t score = get_present_mode_score(present_modes[i]);
+        u32 score = get_present_mode_score(present_modes[i]);
         if (score > selection_score) {
             selection_score = score;
             state->present_mode = present_modes[i];
@@ -275,7 +278,7 @@ bool select_present_mode(RendererState* state) {
 
 bool check_required_layers() {
     VkLayerProperties layer_properties[32];
-    uint32_t layer_property_count = 32;
+    u32 layer_property_count = 32;
     
     VkResult result = vkEnumerateInstanceLayerProperties(&layer_property_count, layer_properties);
     
@@ -302,8 +305,8 @@ bool check_required_layers() {
     return true;
 }
 
-bool check_required_instance_extensions(const char** extensions, uint32_t count) {
-    uint32_t extension_property_count = 0;
+bool check_required_instance_extensions(const char** extensions, u32 count) {
+    u32 extension_property_count = 0;
     VkResult result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_property_count, nullptr);
     
     if (result != VK_SUCCESS) {
@@ -340,7 +343,7 @@ bool check_required_instance_extensions(const char** extensions, uint32_t count)
 }
 
 bool check_required_device_extensions(VkPhysicalDevice physical_device) {
-    uint32_t extension_property_count = 0;
+    u32 extension_property_count = 0;
     VkResult result = vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_property_count, nullptr);
     
     if (result != VK_SUCCESS) {
@@ -377,7 +380,7 @@ bool check_required_device_extensions(VkPhysicalDevice physical_device) {
 }
 
 bool create_instance(VkInstance* instance) {
-    uint32_t version;
+    u32 version;
     VkResult result = vkEnumerateInstanceVersion(&version);
     if (result != VK_SUCCESS) {
         printf("vkEnumerateInstanceVersion returned (%s)\n", vk_error_code_str(result));
@@ -397,7 +400,7 @@ bool create_instance(VkInstance* instance) {
     app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.apiVersion = version;
     
-    uint32_t extension_count = 0;
+    u32 extension_count = 0;
     const char** required_instance_extensions = glfwGetRequiredInstanceExtensions(&extension_count);
     
     VkInstanceCreateInfo instance_create_info = {};
@@ -419,21 +422,21 @@ bool create_instance(VkInstance* instance) {
 }
 
 bool create_device_and_queues(RendererState* state) {
-    uint32_t graphics_queue_index = 0;
-    uint32_t transfer_queue_index = 0;
-    uint32_t compute_queue_index = 0;
-    uint32_t present_queue_index = 0;
+    u32 graphics_queue_index = 0;
+    u32 transfer_queue_index = 0;
+    u32 compute_queue_index = 0;
+    u32 present_queue_index = 0;
     
-    uint32_t queue_count_per_family[8] = {0};
+    u32 queue_count_per_family[8] = {0};
     graphics_queue_index = queue_count_per_family[state->selection.graphics_queue_family_index]++;
     transfer_queue_index = queue_count_per_family[state->selection.transfer_queue_family_index]++;
     compute_queue_index  = queue_count_per_family[state->selection.compute_queue_family_index ]++;
     present_queue_index  = queue_count_per_family[state->selection.compute_queue_family_index ]++;
     
-    uint32_t queue_create_info_count = 0;
+    u32 queue_create_info_count = 0;
     
     VkDeviceQueueCreateInfo queue_create_info[8] = {};
-    float graphics_queue_priority[8][8] = {1.0};
+    f32 graphics_queue_priority[8][8] = {1.0};
     
     for (int i = 0;i < 8;++i) {
         if (queue_count_per_family[i] == 0) continue;
@@ -493,8 +496,8 @@ bool create_swapchain(RendererState* state) {
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     
-    uint32_t queue_indices[2] = {0};
-    uint32_t queue_indice_count = 0;
+    u32 queue_indices[2] = {0};
+    u32 queue_indice_count = 0;
     if (state->selection.graphics_queue_family_index == state->selection.present_queue_family_index) {
         swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         queue_indice_count = 0;
@@ -688,26 +691,56 @@ bool create_semaphore(RendererState* state) {
     return true;
 }
 
-bool create_fence(RendererState* state) {
+bool create_submit_fences(RendererState* state) {
     VkFenceCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     
-    state->fences = (VkFence*)calloc(state->swapchain_image_count, sizeof(VkFence));
+    state->submit_fences = (VkFence*)calloc(state->swapchain_image_count, sizeof(VkFence));
     state->submissions = (CommandBufferSubmission*)calloc(state->swapchain_image_count, sizeof(CommandBufferSubmission));
     
     for (int i = 0;i < state->swapchain_image_count;++i) {
-        VkResult result = vkCreateFence(state->device, &create_info, nullptr, &state->fences[i]);
+        VkResult result = vkCreateFence(state->device, &create_info, nullptr, &state->submit_fences[i]);
         if (result != VK_SUCCESS) {
             printf("vkCreateFence returned (%s)\n", vk_error_code_str(result));
             return false;
         }
-        state->submissions[i].fence = &state->fences[i];
+        state->submissions[i].fence = &state->submit_fences[i];
         state->submissions[i].command_buffer = 0;
     }
     
     return true;
 }
+
+bool create_acquire_fences(RendererState* state) {
+    VkFenceCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    
+    state->acquire_fences = (VkFence*)calloc(state->swapchain_image_count, sizeof(VkFence));
+    
+    for (int i = 0;i < state->swapchain_image_count;++i) {
+        VkResult result = vkCreateFence(state->device, &create_info, nullptr, &state->acquire_fences[i]);
+        if (result != VK_SUCCESS) {
+            printf("vkCreateFence returned (%s)\n", vk_error_code_str(result));
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool create_fences(RendererState* state) {
+    if (!create_submit_fences(state)) {
+        return false;
+    }
+    
+    if (!create_acquire_fences(state)) {
+        return false;
+    }
+    
+    return true;
+}
+
 
 bool create_command_pool(RendererState* state) {
     VkCommandPoolCreateInfo create_info = {};
@@ -891,8 +924,8 @@ bool create_gui_graphics_pipeline(RendererState* state) {
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width  = (float)state->swapchain_extent.width;
-    viewport.height = (float)state->swapchain_extent.height;
+    viewport.width  = (f32)state->swapchain_extent.width;
+    viewport.height = (f32)state->swapchain_extent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     
@@ -1016,8 +1049,8 @@ bool create_graphics_pipeline(RendererState* state) {
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width  = (float)state->swapchain_extent.width;
-    viewport.height = (float)state->swapchain_extent.height;
+    viewport.width  = (f32)state->swapchain_extent.width;
+    viewport.height = (f32)state->swapchain_extent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     
@@ -1233,13 +1266,22 @@ void destroy_command_pool(RendererState* state, bool verbose) {
 }
 
 void destroy_fences(RendererState* state, bool verbose) {
-    if (state->fences) {
+    if (state->submit_fences) {
         for (int i = 0;i < state->swapchain_image_count;++i) {
-            printf("Destroying fence (%p)\n", state->fences[i]);
-            vkDestroyFence(state->device, state->fences[i], nullptr);
+            printf("Destroying submit fence (%p)\n", state->submit_fences[i]);
+            vkDestroyFence(state->device, state->submit_fences[i], nullptr);
         }
         
-        free_null(state->fences);
+        free_null(state->submit_fences);
+    }
+    
+    if (state->acquire_fences) {
+        for (int i = 0;i < state->swapchain_image_count;++i) {
+            printf("Destroying acquire fence (%p)\n", state->acquire_fences[i]);
+            vkDestroyFence(state->device, state->acquire_fences[i], nullptr);
+        }
+        
+        free_null(state->acquire_fences);
     }
 }
 

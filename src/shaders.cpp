@@ -7,8 +7,8 @@
 #include "vk_helper.hpp"
 #include "utils.hpp"
 
-uint32_t get_file_size(FILE* file) {
-    uint32_t size = 0;
+u32 get_file_size(FILE* file) {
+    u32 size = 0;
     
     fseek(file, 0, SEEK_END);
     size = ftell(file);
@@ -17,7 +17,7 @@ uint32_t get_file_size(FILE* file) {
     return size;
 }
 
-void copy_file_to(FILE* file, char* dest, uint32_t file_size = 0) {
+void copy_file_to(FILE* file, char* dest, u32 file_size = 0) {
     if (file_size == 0) {
         file_size = get_file_size(file);
     }
@@ -28,7 +28,7 @@ void copy_file_to(FILE* file, char* dest, uint32_t file_size = 0) {
     }
 }
 
-bool load_shader_code(const char* filename, uint32_t** code, uint32_t* code_size) {
+bool load_shader_code(const char* filename, u32** code, u32* code_size) {
     char full_filename[256] = {0};
     // @Warning: this is unchecked
     get_full_path_from_root(filename, full_filename);
@@ -45,20 +45,20 @@ bool load_shader_code(const char* filename, uint32_t** code, uint32_t* code_size
     
     copy_file_to(file, char_code, *code_size);
     
-    *code = (uint32_t*)char_code;
+    *code = (u32*)char_code;
     
     fclose(file);
     
     return true;
 }
 
-void free_shader_code(uint32_t* code) {
+void free_shader_code(u32* code) {
     free_null(code);
 }
 
 bool create_shader_module(VkDevice device, const char* filename, VkShaderModule* module) {
-    uint32_t  code_size = 0;
-    uint32_t* code = 0;
+    u32  code_size = 0;
+    u32* code = 0;
     
     if (!load_shader_code(filename, &code, &code_size)) {
         free_null(code);
@@ -87,7 +87,7 @@ bool load_shader_module(const char* filename, const char* shader_name, VkDevice 
         return false;
     }
     
-    uint32_t index = hash(shader_name) % catalog->count;
+    u32 index = hash(shader_name) % catalog->count;
     
     if (catalog->modules[index] != 0) {
         printf("Error: shader name collision in hashtable.\n");
@@ -108,7 +108,7 @@ bool get_shader_from_catalog(const char* shader_name, ShaderCatalog* catalog, Vk
         return false;
     }
     
-    uint32_t index = hash(shader_name) % catalog->count;
+    u32 index = hash(shader_name) % catalog->count;
     
     if (catalog->modules[index] == 0) {
         printf("Error: shader name has not been loaded.\n");
@@ -120,7 +120,7 @@ bool get_shader_from_catalog(const char* shader_name, ShaderCatalog* catalog, Vk
     return true;
 }
 
-bool init_shader_catalog(uint32_t size, ShaderCatalog* catalog) {
+bool init_shader_catalog(u32 size, ShaderCatalog* catalog) {
     catalog->modules = (VkShaderModule*)calloc(size, sizeof(VkShaderModule));
     catalog->count = size;
     

@@ -1,4 +1,4 @@
-uint64_t get_time_ns() {
+u64 get_time_ns() {
     struct timespec result = {};
     clock_gettime(CLOCK_MONOTONIC, &result);
     

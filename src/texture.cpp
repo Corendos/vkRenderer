@@ -56,7 +56,7 @@ bool create_texture_catalog_command_pool(RendererState* state) {
     return true;
 }
 
-bool init_texture_catalog(RendererState* state, uint32_t size) {
+bool init_texture_catalog(RendererState* state, u32 size) {
     TextureCatalog* catalog = &state->texture_catalog;
     catalog->textures = (Texture*)calloc(size, sizeof(Texture));
     catalog->count = size;
@@ -117,7 +117,7 @@ void cleanup_texture_catalog(RendererState* state, bool verbose) {
     destroy_textures(state, verbose);
 }
 
-VkFormat get_format_from_channels(uint32_t channels) {
+VkFormat get_format_from_channels(u32 channels) {
     switch (channels) {
         case 1:
         return VK_FORMAT_R8_UNORM;
@@ -131,7 +131,7 @@ VkFormat get_format_from_channels(uint32_t channels) {
     return VK_FORMAT_UNDEFINED;
 }
 
-bool create_texture(RendererState* state, Texture* texture, uint32_t width, uint32_t height, uint32_t channels) {
+bool create_texture(RendererState* state, Texture* texture, u32 width, u32 height, u32 channels) {
     texture->width    = width;
     texture->height   = height;
     texture->channels = channels;
@@ -303,7 +303,7 @@ bool load_texture(RendererState *state, const char* filename, const char* textur
         return false;
     }
     
-    uint32_t index = hash(texture_name) % catalog->count;
+    u32 index = hash(texture_name) % catalog->count;
     
     if (catalog->textures[index].image != 0) {
         printf("Error: texture name collision in hashtable.\n");
@@ -315,16 +315,16 @@ bool load_texture(RendererState *state, const char* filename, const char* textur
     get_full_path_from_root(filename, full_filename);
     
     int width, height, channels;
-    uint8_t* pixels = stbi_load(full_filename, &width, &height, &channels, 4);
+    u8* pixels = stbi_load(full_filename, &width, &height, &channels, 4);
     if (!pixels) {
         printf("Error: failed to load image '%s'.\n", filename);
         return false;
     }
     
     // Copy the data to the staging buffer
-    uint64_t start = get_time_ns();
+    u64 start = get_time_ns();
     memcpy(catalog->allocation.data, pixels, width * height * 4);
-    uint64_t end = get_time_ns();
+    u64 end = get_time_ns();
     
     printf("memcpy took %ld ns\n", end - start);
     

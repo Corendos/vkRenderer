@@ -22,20 +22,23 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
-void mouse_position_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
+void mouse_position_callback(GLFWwindow* window, f64 mouse_x, f64 mouse_y) {
     WindowUserData* user_data = (WindowUserData*)glfwGetWindowUserPointer(window);
     
     user_data->input->changed = true;
     
-    double last_mouse_x = user_data->input->mouse_x;
-    double last_mouse_y = user_data->input->mouse_y;
+    f64 last_mouse_x = user_data->input->mouse_x;
+    f64 last_mouse_y = user_data->input->mouse_y;
     
     user_data->input->mouse_x = mouse_x;
     user_data->input->mouse_y = mouse_y;
     
     if (user_data->input->not_first_delta) {
-        user_data->input->mouse_delta_x = user_data->input->mouse_x - last_mouse_x;
+        user_data->input->mouse_delta_x= user_data->input->mouse_x - last_mouse_x;
         user_data->input->mouse_delta_y = user_data->input->mouse_y - last_mouse_y;
+        printf("Delta x: %06.6f Delta y: %06.6f\n",
+               user_data->input->mouse_delta_x,
+               user_data->input->mouse_delta_y);
     } else {
         user_data->input->not_first_delta = true;
     }

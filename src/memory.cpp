@@ -5,7 +5,7 @@
 
 #include "macros.hpp"
 
-bool init_memory(MemoryManager* manager, uint64_t allocation_size, uint64_t min_page_size, VkPhysicalDevice physical_device) {
+bool init_memory(MemoryManager* manager, u64 allocation_size, u64 min_page_size, VkPhysicalDevice physical_device) {
     vkGetPhysicalDeviceMemoryProperties(physical_device, &manager->memory_properties);
     
     manager->pools = (MemoryPool**)calloc(manager->memory_properties.memoryTypeCount, sizeof(MemoryPool*));
@@ -60,7 +60,7 @@ void cleanup_chunk(MemoryManager* manager, MemoryChunk* chunk) {
 
 int32_t find_memory_type_index(MemoryManager* manager, VkMemoryRequirements requirements, VkMemoryPropertyFlags required_properties) {
     for (int i = 0;i < manager->memory_properties.memoryTypeCount;++i) {
-        uint32_t memory_type_bit = (1 << i);
+        u32 memory_type_bit = (1 << i);
         bool valid_memory_type = requirements.memoryTypeBits & memory_type_bit;
         
         bool valid_flags = (required_properties & manager->memory_properties.memoryTypes[i].propertyFlags) == required_properties;
@@ -71,7 +71,7 @@ int32_t find_memory_type_index(MemoryManager* manager, VkMemoryRequirements requ
     return -1;
 }
 
-bool allocate_pool_for_type(MemoryManager* manager, VkDevice device, uint32_t type, VkMemoryPropertyFlags flags, MemoryPool** pool) {
+bool allocate_pool_for_type(MemoryManager* manager, VkDevice device, u32 type, VkMemoryPropertyFlags flags, MemoryPool** pool) {
     MemoryPool* new_pool = (MemoryPool*)calloc(1, sizeof(MemoryPool));
     new_pool->base_chunk.size = manager->allocation_size;
     new_pool->memory_type = type;
@@ -158,7 +158,7 @@ bool allocate_from_chunk(MemoryManager* manager, MemoryPool* pool, MemoryChunk* 
         allocated_chunk->real_size      = requirements.size;
         allocated_chunk->offset         = chunk->offset;
         allocated_chunk->mappable       = pool->mappable;
-        allocated_chunk->data           = (uint8_t*)pool->data + chunk->offset;
+        allocated_chunk->data           = (u8*)pool->data + chunk->offset;
         
         chunk->full = true;
         return true;
@@ -173,7 +173,7 @@ bool allocate_from_chunk(MemoryManager* manager, MemoryPool* pool, MemoryChunk* 
             allocated_chunk->real_size      = requirements.size;
             allocated_chunk->offset         = chunk->offset;
             allocated_chunk->mappable       = pool->mappable;
-            allocated_chunk->data           = (uint8_t*)pool->data + chunk->offset;
+            allocated_chunk->data           = (u8*)pool->data + chunk->offset;
             chunk->full = true;
             return true;
         }
@@ -240,7 +240,7 @@ void free_from_chunk(MemoryManager* manager, MemoryPool* pool, MemoryChunk* chun
         return;
     }
     
-    uint32_t sub_chunk_size = chunk->size / 2;
+    u32 sub_chunk_size = chunk->size / 2;
     if (allocated_chunk->offset >= chunk->offset + sub_chunk_size) {
         if (chunk->right == 0) {
             printf("**** ERROR ****\n");
@@ -266,14 +266,14 @@ void free_from_chunk(MemoryManager* manager, MemoryPool* pool, MemoryChunk* chun
     return;
 }
 
-void memory_snapshot(MemoryManager* manager, MemoryPool* pool, uint8_t* occupancy) {
+void memory_snapshot(MemoryManager* manager, MemoryPool* pool, u8* occupancy) {
     memory_snapshot_chunk(manager, &pool->base_chunk, occupancy);
 }
 
-void memory_snapshot_chunk(MemoryManager* manager, MemoryChunk* chunk, uint8_t* occupancy) {
+void memory_snapshot_chunk(MemoryManager* manager, MemoryChunk* chunk, u8* occupancy) {
     if (chunk->full) {
-        uint32_t start_index = chunk->offset / manager->min_page_size;
-        uint32_t size = chunk->size / manager->min_page_size;
+        u32 start_index = chunk->offset / manager->min_page_size;
+        u32 size = chunk->size / manager->min_page_size;
         for (int i = start_index;i < start_index + size;++i) {
             occupancy[i] = 1;
         }

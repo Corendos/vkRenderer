@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 
-Vec2f new_vec2f(float x, float y) {
+Vec2f new_vec2f(f32 x, f32 y) {
     Vec2f v = {};
     v.x = x;
     v.y = y;
@@ -11,7 +11,7 @@ Vec2f new_vec2f(float x, float y) {
     return v;
 }
 
-Vec3f new_vec3f(float x, float y, float z) {
+Vec3f new_vec3f(f32 x, f32 y, f32 z) {
     Vec3f v = {};
     v.x = x;
     v.y = y;
@@ -20,7 +20,7 @@ Vec3f new_vec3f(float x, float y, float z) {
     return v;
 }
 
-Vec4f new_vec4f(float x, float y, float z, float w) {
+Vec4f new_vec4f(f32 x, f32 y, f32 z, f32 w) {
     Vec4f v = {};
     v.x = x;
     v.y = y;
@@ -30,10 +30,10 @@ Vec4f new_vec4f(float x, float y, float z, float w) {
     return v;
 }
 
-Mat4f new_mat4f(float m00, float m01, float m02, float m03,
-                float m10, float m11, float m12, float m13,
-                float m20, float m21, float m22, float m23,
-                float m30, float m31, float m32, float m33) {
+Mat4f new_mat4f(f32 m00, f32 m01, f32 m02, f32 m03,
+                f32 m10, f32 m11, f32 m12, f32 m13,
+                f32 m20, f32 m21, f32 m22, f32 m23,
+                f32 m30, f32 m31, f32 m32, f32 m33) {
     Mat4f m = {};
     
     m.m00 = m00;
@@ -59,10 +59,10 @@ Mat4f new_mat4f(float m00, float m01, float m02, float m03,
     return m;
 }
 
-Mat4f perspective(float fov, float aspect, float near, float far) {
+Mat4f perspective(f32 fov, f32 aspect, f32 near, f32 far) {
     Mat4f m = {};
     
-    float s = 1.0 / tan(fov / 2.0 * PI / 180.0f);
+    f32 s = 1.0 / tan(fov / 2.0 * PI / 180.0f);
     
     m.m00 = s / aspect;
     m.m11 = -s;
@@ -99,7 +99,7 @@ Mat4f look_at(Vec3f eye, Vec3f origin, Vec3f up) {
                      0,         0,         0,         1);
 }
 
-Mat4f look_from_yaw_and_pitch(Vec3f position, float yaw, float pitch, Vec3f up) {
+Mat4f look_from_yaw_and_pitch(Vec3f position, f32 yaw, f32 pitch, Vec3f up) {
     Mat4f m = {};
     Vec3f forward = new_vec3f(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch));
     Vec3f right = new_vec3f(cos(yaw), 0.0f, -sin(yaw));
@@ -111,7 +111,7 @@ Mat4f look_from_yaw_and_pitch(Vec3f position, float yaw, float pitch, Vec3f up) 
                      0,         0,         0,         1);
 }
 
-Mat4f scale_matrix(float scale_x, float scale_y, float scale_z) {
+Mat4f scale_matrix(f32 scale_x, f32 scale_y, f32 scale_z) {
     Mat4f m = {};
     
     m.m00 = scale_x;
@@ -122,13 +122,13 @@ Mat4f scale_matrix(float scale_x, float scale_y, float scale_z) {
     return m;
 }
 
-Mat4f rotation_matrix(float angle_x, float angle_y, float angle_z) {
-    float cx = cos(angle_x);
-    float sx = sin(angle_x);
-    float cy = cos(angle_y);
-    float sy = sin(angle_y);
-    float cz = cos(angle_z);
-    float sz = sin(angle_z);
+Mat4f rotation_matrix(f32 angle_x, f32 angle_y, f32 angle_z) {
+    f32 cx = cos(angle_x);
+    f32 sx = sin(angle_x);
+    f32 cy = cos(angle_y);
+    f32 sy = sin(angle_y);
+    f32 cz = cos(angle_z);
+    f32 sz = sin(angle_z);
     
     Mat4f m = {};
     m.m00 = cz * cy;
@@ -148,7 +148,7 @@ Mat4f rotation_matrix(float angle_x, float angle_y, float angle_z) {
     return m;
 }
 
-Mat4f translation_matrix(float dx, float dy, float dz) {
+Mat4f translation_matrix(f32 dx, f32 dy, f32 dz) {
     Mat4f m = {};
     
     m.m00 = 1.0f;
@@ -200,15 +200,15 @@ Vec4f mul(Mat4f* a, Vec4f* v) {
     return result;
 }
 
-float dot(Vec2f* a, Vec2f* b) {
+f32 dot(Vec2f* a, Vec2f* b) {
     return a->x * b->x + a->y * b->y;
 }
 
-float dot(Vec3f* a, Vec3f* b) {
+f32 dot(Vec3f* a, Vec3f* b) {
     return a->x * b->x + a->y * b->y + a->z * b->z;
 }
 
-float dot(Vec4f* a, Vec4f* b) {
+f32 dot(Vec4f* a, Vec4f* b) {
     return a->x * b->x + a->y * b->y + a->z * b->z + a->w * b->w;
 }
 
@@ -218,20 +218,20 @@ Vec3f cross(Vec3f* a, Vec3f* b) {
                      a->x * b->y - a->y * b->x);
 }
 
-float length(Vec2f* a) {
+f32 length(Vec2f* a) {
     return sqrt(dot(a, a));
 }
 
-float length(Vec3f* a) {
+f32 length(Vec3f* a) {
     return sqrt(dot(a, a));
 }
 
-float length(Vec4f* a) {
+f32 length(Vec4f* a) {
     return sqrt(dot(a, a));
 }
 
 Vec2f normalize(Vec2f* a) {
-    float l = length(a);
+    f32 l = length(a);
     if (l == 0.0) return *a;
     Vec2f v = {};
     
@@ -242,7 +242,7 @@ Vec2f normalize(Vec2f* a) {
 }
 
 Vec3f normalize(Vec3f* a) {
-    float l = length(a);
+    f32 l = length(a);
     if (l == 0.0) return *a;
     
     Vec3f v = {};
@@ -255,7 +255,7 @@ Vec3f normalize(Vec3f* a) {
 }
 
 Vec4f normalize(Vec4f* a) {
-    float l = length(a);
+    f32 l = length(a);
     if (l == 0.0) return *a;
     
     Vec4f v = {};
@@ -314,7 +314,7 @@ Mat4f operator*(Mat4f& m1, Mat4f& m2) {
     return mul(&m1, &m2);
 }
 
-float clamp(float value, float a, float b) {
+f32 clamp(f32 value, f32 a, f32 b) {
     if (value > b) {
         return b;
     }
@@ -324,14 +324,14 @@ float clamp(float value, float a, float b) {
     return value;
 }
 
-float randf() {
-    return (float)rand() / (float)RAND_MAX;
+f32 randf() {
+    return (f32)rand() / (f32)RAND_MAX;
 }
 
 
-char* to_string(Vec2f v, TemporaryStorage* temporary_storage, uint32_t indentation_level) {
+char* to_string(Vec2f v, TemporaryStorage* temporary_storage, u32 indentation_level) {
     char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
-    for (uint32_t i = 0;i < indentation_level;i++) {
+    for (u32 i = 0;i < indentation_level;i++) {
         indent_space[i] = ' ';
     }
     indent_space[indentation_level] = 0;
@@ -349,9 +349,9 @@ char* to_string(Vec2f v, TemporaryStorage* temporary_storage, uint32_t indentati
     return str;
 }
 
-char* to_string(Vec3f v, TemporaryStorage* temporary_storage, uint32_t indentation_level) {
+char* to_string(Vec3f v, TemporaryStorage* temporary_storage, u32 indentation_level) {
     char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
-    for (uint32_t i = 0;i < indentation_level;i++) {
+    for (u32 i = 0;i < indentation_level;i++) {
         indent_space[i] = ' ';
     }
     indent_space[indentation_level] = 0;
@@ -371,9 +371,9 @@ char* to_string(Vec3f v, TemporaryStorage* temporary_storage, uint32_t indentati
     return str;
 }
 
-char* to_string(Vec4f v, TemporaryStorage* temporary_storage, uint32_t indentation_level) {
+char* to_string(Vec4f v, TemporaryStorage* temporary_storage, u32 indentation_level) {
     char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
-    for (uint32_t i = 0;i < indentation_level;i++) {
+    for (u32 i = 0;i < indentation_level;i++) {
         indent_space[i] = ' ';
     }
     indent_space[indentation_level] = 0;

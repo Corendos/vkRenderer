@@ -17,13 +17,13 @@ struct CameraResources {
 
 struct Camera {
     Vec3f position;
-    float aspect;
-    float fov;
+    f32 aspect;
+    f32 fov;
     
-    float yaw;
-    float pitch;
+    f32 yaw;
+    f32 pitch;
     
-    float speed;
+    f32 speed;
     
     CameraContext context;
 };

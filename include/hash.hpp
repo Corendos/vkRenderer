@@ -3,6 +3,6 @@
 
 #include <cstdint>
 
-uint64_t hash(const char* str);
+u64 hash(const char* str);
 
 #endif

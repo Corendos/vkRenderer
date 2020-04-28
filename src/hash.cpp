@@ -1,12 +1,12 @@
 #include "hash.hpp"
 
-uint64_t hash(const char* str) {
-    uint64_t hash = 0;
+u64 hash(const char* str) {
+    u64 hash = 0;
     int c;
-
+    
     while (c = *str++) {
-	hash = c + (hash << 6) + (hash << 16) - hash;
+        hash = c + (hash << 6) + (hash << 16) - hash;
     }
-
+    
     return hash;
 }

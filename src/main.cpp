@@ -5,10 +5,14 @@
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 #include <time.h>
+#include <unistd.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "types.hpp"
+
+#include "benchmark.hpp"
 #include "camera.hpp"
 #include "color.hpp"
 #include "gui.hpp"
@@ -26,6 +30,7 @@
 #include "window.hpp"
 #include "window_user_data.hpp"
 
+#include "benchmark.cpp"
 #include "color.cpp"
 #include "gui.cpp"
 #include "hash.cpp"
@@ -42,10 +47,10 @@
 
 
 struct FpsCounter {
-    uint64_t start;
-    uint64_t end;
-    uint64_t cumulated_frame_duration;
-    uint32_t frame_count;
+    u64 start;
+    u64 end;
+    u64 cumulated_frame_duration;
+    u32 frame_count;
 };
 
 const char* get_device_type_str(VkPhysicalDeviceType type) {
@@ -65,27 +70,43 @@ const char* get_device_type_str(VkPhysicalDeviceType type) {
 }
 
 struct Time {
-    uint64_t start;
-    uint64_t end;
-    float delta_time;
-    float cumulated_time;
+    u64 start;
+    u64 end;
+    f32 delta_time;
+    f32 cumulated_time;
 };
 
-void do_input(Input* input) {
+void do_input(RendererState* state, Input* input) {
     reset_input(input);
     glfwPollEvents();
+    
+    f64 last_mouse_x = input->mouse_x;
+    f64 last_mouse_y = input->mouse_y;
+    
+    glfwGetCursorPos(state->window, &input->mouse_x, &input->mouse_y);
+    
+    if (input->not_first_delta) {
+        input->mouse_delta_x = input->mouse_x - state->swapchain_extent.width / 2;
+        input->mouse_delta_y = input->mouse_y - state->swapchain_extent.height / 2;
+    } else {
+        input->not_first_delta = true;
+    }
+    
+    if (state->cursor_locked) {
+        glfwSetCursorPos(state->window, state->swapchain_extent.width / 2, state->swapchain_extent.height / 2);
+    }
 }
 
 void update_fps_counter(GLFWwindow* window, FpsCounter* fps_counter) {
     fps_counter->end = get_time_ns();
-    uint64_t last_start = fps_counter->start;
+    u64 last_start = fps_counter->start;
     fps_counter->start = get_time_ns();
     
     fps_counter->cumulated_frame_duration += fps_counter->end - last_start;
     fps_counter->frame_count++;
     
     if (fps_counter->frame_count == 1000) {
-        double average_frame_duration = (double)fps_counter->cumulated_frame_duration / (double)fps_counter->frame_count;
+        f64 average_frame_duration = (f64)fps_counter->cumulated_frame_duration / (f64)fps_counter->frame_count;
         average_frame_duration /= 1000000000.0;
         
         fps_counter->frame_count = 0;
@@ -163,7 +184,7 @@ bool handle_swapchain_recreation(RendererState* state, WindowUserData* window_us
         window_user_data->swapchain_need_recreation = false;
         state->last_image_index = state->swapchain_image_count - 1;
         
-        state->camera.aspect = (float)state->swapchain_extent.width / (float)state->swapchain_extent.height;
+        state->camera.aspect = (f32)state->swapchain_extent.width / (f32)state->swapchain_extent.height;
         state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
         state->gui_state.screen_size = new_vec2f(state->swapchain_extent.width, state->swapchain_extent.height);
         
@@ -174,10 +195,10 @@ bool handle_swapchain_recreation(RendererState* state, WindowUserData* window_us
 }
 
 
-bool create_entity(RendererState* state, Vertex* vertex_buffer, uint32_t vertex_buffer_size, uint32_t* entity_id) {
+bool create_entity(RendererState* state, Vertex* vertex_buffer, u32 vertex_buffer_size, u32* entity_id) {
     if (state->entity_count == MAX_ENTITY_COUNT) return false;
     
-    uint32_t buffer_size = vertex_buffer_size * sizeof(Vertex);
+    u32 buffer_size = vertex_buffer_size * sizeof(Vertex);
     
     VkBufferCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -225,7 +246,7 @@ bool create_entity(RendererState* state, Vertex* vertex_buffer, uint32_t vertex_
 }
 
 bool create_square_entity(RendererState* state) {
-    float z = 0.0f;
+    f32 z = 0.0f;
     Vertex vertex_buffer[6] = {};
     vertex_buffer[0].position = new_vec3f(-0.5, -0.5, z);
     vertex_buffer[0].color    = new_vec3f(1.0, 0.0, 0.0);
@@ -241,7 +262,7 @@ bool create_square_entity(RendererState* state) {
     vertex_buffer[5].position = new_vec3f(0.5, -0.5, z);
     vertex_buffer[5].color    = new_vec3f(0.0, 0.0, 1.0);
     
-    uint32_t entity_id = 0;
+    u32 entity_id = 0;
     
     return create_entity(state, vertex_buffer, array_size(vertex_buffer), &entity_id);
 }
@@ -344,7 +365,7 @@ void create_cube(Vec3f size, Vertex* vertices) {
     vertices[35].color = new_vec3f(0.0f, 1.0f, 1.0f);
 }
 
-Mat4f random_translation_matrix(float range) {
+Mat4f random_translation_matrix(f32 range) {
     return translation_matrix(2.0f * randf() * range - range,
                               2.0f * randf() * range - range,
                               2.0f * randf() * range - range);
@@ -360,7 +381,7 @@ bool create_cube_entity(RendererState* state) {
     Vertex vertex_buffer[36] = {};
     create_cube(new_vec3f(0.2f, 0.2f, 0.2f), vertex_buffer);
     
-    uint32_t entity_id = 0;
+    u32 entity_id = 0;
     
     if(!create_entity(state, vertex_buffer, array_size(vertex_buffer), &entity_id)) {
         return false;
@@ -479,8 +500,8 @@ bool init_camera(RendererState* state) {
     state->camera.position = new_vec3f(0.0f, 0.0f, 0.0f);
     state->camera.yaw = -PI_2;
     state->camera.pitch = 0.0f;
-    state->camera.speed = 0.7f;
-    state->camera.aspect = (float)state->swapchain_extent.width / (float)state->swapchain_extent.height;
+    state->camera.speed = 0.001f;
+    state->camera.aspect = (f32)state->swapchain_extent.width / (f32)state->swapchain_extent.height;
     
     state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
     state->camera.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
@@ -619,6 +640,13 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
         printf("temporary_storage init : success\n");
     }
     
+    if (!init_temporary_storage(&state->main_arena, MAIN_ARENA_SIZE)) {
+        printf("Error: failed to initialize main arena\n");
+        return false;
+    } else {
+        printf("main arena init : success\n");
+    }
+    
     if (!glfwInit()) {
         printf("Error: failed to initialize glfw library\n");
         return false;
@@ -657,7 +685,7 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
         printf("surface init: success\n");
     }
     
-    uint32_t extension_count = 0;
+    u32 extension_count = 0;
     const char** required_instance_extensions = glfwGetRequiredInstanceExtensions(&extension_count);
     
     if (!check_required_instance_extensions(required_instance_extensions, extension_count)) {
@@ -686,8 +714,8 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
         printf("device and queues init: success\n");
     }
     
-    uint32_t allocation_size = mega(128);
-    uint32_t min_page_size = kilo(4);
+    u32 allocation_size = MB(128);
+    u32 min_page_size = KB(4);
     
     if (!init_memory(&state->memory_manager, allocation_size, min_page_size, state->selection.device)) {
         return false;
@@ -725,7 +753,7 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
         return false;
     }
     
-    if (!create_fence(state)) {
+    if (!create_fences(state)) {
         return false;
     }
     
@@ -820,8 +848,8 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
     }
     
     Vec2f screen_size = {};
-    screen_size.x = (float)state->swapchain_extent.width;
-    screen_size.y = (float)state->swapchain_extent.height;
+    screen_size.x = (f32)state->swapchain_extent.width;
+    screen_size.y = (f32)state->swapchain_extent.height;
     if (!init_gui(&state->gui_state, &state->gui_resources, state)) {
         return false;
     } else {
@@ -850,23 +878,38 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
     
     glfwSetWindowUserPointer(state->window, window_user_data);
     glfwSetKeyCallback(state->window, key_callback);
-    glfwSetCursorPosCallback(state->window, mouse_position_callback);
+    //glfwSetCursorPosCallback(state->window, mouse_position_callback);
     glfwSetMouseButtonCallback(state->window, mouse_button_callback);
     glfwSetWindowSizeCallback(state->window, window_resize_callback);
     glfwSetFramebufferSizeCallback(state->window, framebuffer_resize_callback);
     
     state->cursor_locked = true;
     glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    if (glfwRawMouseMotionSupported()) {
-        glfwSetInputMode(state->window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-    }
+    glfwSetCursorPos(state->window, state->swapchain_extent.width / 2, state->swapchain_extent.height / 2);
     
+    state->image_index = 0;
     state->last_image_index = state->swapchain_image_count - 1;
     
     return true;
 }
 
-bool wait_for_fence(RendererState* state) {
+bool wait_for_acquire_fence(RendererState* state) {
+    VkResult result = vkWaitForFences(state->device, 1, &state->acquire_fences[state->current_semaphore_index], VK_TRUE, 1000000000);
+    if (result != VK_SUCCESS) {
+        printf("vkWaitForFences returned (%s)\n", vk_error_code_str(result));
+        return false;
+    }
+    
+    result = vkResetFences(state->device, 1, &state->acquire_fences[state->current_semaphore_index]);
+    if (result != VK_SUCCESS) {
+        printf("vkResetFences returned (%s)\n", vk_error_code_str(result));
+        return false;
+    }
+    
+    return true;
+}
+
+bool wait_for_submit_fence(RendererState* state) {
     VkResult result = vkWaitForFences(state->device, 1, state->submissions[state->image_index].fence, VK_TRUE, 1000000000);
     if (result != VK_SUCCESS) {
         printf("vkWaitForFences returned (%s)\n", vk_error_code_str(result));
@@ -884,15 +927,15 @@ bool wait_for_fence(RendererState* state) {
 
 void update_time(Time* time) {
     time->end = get_time_ns();
-    time->delta_time = (float)(time->end - time->start) / 1e9f;
+    time->delta_time = (f32)(time->end - time->start) / 1e9f;
     time->cumulated_time += time->delta_time;
     time->start = get_time_ns();
 }
 
 void update_camera(RendererState* state, Input* input, Time* time) {
     if (state->cursor_locked) {
-        state->camera.yaw -= input->mouse_delta_x * state->camera.speed * time->delta_time;
-        state->camera.pitch += input->mouse_delta_y * state->camera.speed * time->delta_time;
+        state->camera.yaw -= input->mouse_delta_x * state->camera.speed;
+        state->camera.pitch += input->mouse_delta_y * state->camera.speed;
     }
     
     if (state->camera.yaw > 2.0 * PI) {
@@ -936,13 +979,13 @@ void update_entities(RendererState* state) {
 void update_gui(RendererState* state, Input* input) {
     reset_gui(&state->gui_state);
     
-    uint32_t button_height = 40;
-    uint32_t button_width  = 200;
+    u32 button_height = 40;
+    u32 button_width  = 200;
     
-    uint32_t y_offset = button_height + 10;
-    uint32_t current_offset = 10;
+    u32 y_offset = button_height + 10;
+    u32 current_offset = 10;
     
-    for (uint32_t i = 0;i < 4;++i) {
+    for (u32 i = 0;i < 4;++i) {
         bool button_pressed = draw_button(&state->gui_state, input,
                                           state->button_state[i],
                                           current_offset, 10,
@@ -977,14 +1020,10 @@ void update(RendererState* state, Input* input, Time* time) {
         
         if (state->cursor_locked) {
             glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-            if (glfwRawMouseMotionSupported()) {
-                glfwSetInputMode(state->window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-            }
+            glfwSetCursorPos(state->window, state->swapchain_extent.width / 2, state->swapchain_extent.height / 2);
         } else {
             glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            if (glfwRawMouseMotionSupported()) {
-                glfwSetInputMode(state->window, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);
-            }
+            //glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
         }
     }
 }
@@ -1055,12 +1094,12 @@ VkResult render(RendererState* state) {
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = &state->acquire_semaphores[state->last_image_index];
+    submit_info.pWaitSemaphores = &state->acquire_semaphores[state->current_semaphore_index];
     submit_info.pWaitDstStageMask = &stage;
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &command_buffer;
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &state->present_semaphores[state->image_index];
+    submit_info.pSignalSemaphores = &state->present_semaphores[state->current_semaphore_index];
     
     if (state->submissions[state->image_index].command_buffer) {
         vkFreeCommandBuffers(state->device, state->command_pool, 1, &state->submissions[state->image_index].command_buffer);
@@ -1078,7 +1117,7 @@ VkResult render(RendererState* state) {
     VkPresentInfoKHR present_info = {};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &state->present_semaphores[state->image_index];
+    present_info.pWaitSemaphores = &state->present_semaphores[state->current_semaphore_index];
     present_info.swapchainCount = 1;
     present_info.pSwapchains = &state->swapchain;
     present_info.pImageIndices = &state->image_index;
@@ -1102,7 +1141,9 @@ void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time
         return;
     }
     
-    VkResult acquire_result = vkAcquireNextImageKHR(state->device, state->swapchain, 0, state->acquire_semaphores[state->last_image_index], VK_NULL_HANDLE, &state->image_index);
+    VkResult acquire_result = vkAcquireNextImageKHR(state->device, state->swapchain, 0, state->acquire_semaphores[state->current_semaphore_index],
+                                                    state->acquire_fences[state->current_semaphore_index],
+                                                    &state->image_index);
     if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
         window_user_data->swapchain_need_recreation= true;
         return;
@@ -1111,18 +1152,27 @@ void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time
         state->crashed = true;
     }
     
-    if (!wait_for_fence(state)) {
+    if (!wait_for_acquire_fence(state)) {
+        state->crashed = true;
+        return;
+    }
+    if (!wait_for_submit_fence(state)) {
         state->crashed = true;
         return;
     }
     
+    do_input(state, window_user_data->input);
+    
     update(state, window_user_data->input, time);
+    
     VkResult render_result = render(state);
     if (render_result == VK_ERROR_OUT_OF_DATE_KHR) {
         window_user_data->swapchain_need_recreation = true;
     } else if (render_result != VK_SUCCESS) {
         state->crashed = true;
     }
+    
+    state->current_semaphore_index = (state->current_semaphore_index + 1) % state->swapchain_image_count;
 }
 
 void destroy_camera(RendererState* state, bool verbose = true) {
@@ -1185,9 +1235,9 @@ void destroy_entities(RendererState* state, bool verbose = true) {
 }
 
 void cleanup(RendererState* state) {
-    if (state->fences) {
+    if (state->submit_fences) {
         for (int i = 0;i < state->swapchain_image_count;++i) {
-            vkWaitForFences(state->device, 1, &state->fences[i], VK_TRUE, 1000000000);
+            vkWaitForFences(state->device, 1, &state->submit_fences[i], VK_TRUE, 1000000000);
         }
     }
     
@@ -1222,6 +1272,7 @@ void cleanup(RendererState* state) {
     destroy_surface(state, true);
     destroy_instance(state, true);
     destroy_temporary_storage(&state->temporary_storage, true);
+    destroy_temporary_storage(&state->main_arena, true);
 }
 
 int main() {
@@ -1242,7 +1293,6 @@ int main() {
     fps_counter.start = get_time_ns();
     
     while (!glfwWindowShouldClose(state.window) && !state.crashed) {
-        do_input(&input);
         do_frame(&state, &window_user_data, &time);
         
         update_fps_counter(state.window, &fps_counter);

@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 
+#include "benchmark.hpp"
 #include "shaders.hpp"
 #include "texture.hpp"
 #include "memory.hpp"
@@ -13,6 +14,7 @@
 #include "temporary_storage.hpp"
 
 #define MAX_ENTITY_COUNT 1024
+#define MAIN_ARENA_SIZE MB(256)
 
 enum DescriptorSetLayoutName {
     CameraDescriptorSetLayout,
@@ -22,10 +24,10 @@ enum DescriptorSetLayoutName {
 
 struct PhysicalDeviceSelection {
     VkPhysicalDevice device;
-    uint32_t graphics_queue_family_index;
-    uint32_t transfer_queue_family_index;
-    uint32_t compute_queue_family_index;
-    uint32_t present_queue_family_index;
+    u32 graphics_queue_family_index;
+    u32 transfer_queue_family_index;
+    u32 compute_queue_family_index;
+    u32 present_queue_family_index;
 };
 
 struct CommandBufferSubmission {
@@ -39,11 +41,11 @@ struct Vertex {
 };
 
 struct Entity {
-    uint32_t id;
+    u32 id;
     VkBuffer buffer;
     AllocatedMemoryChunk allocation;
-    uint32_t size;
-    uint32_t offset;
+    u32 size;
+    u32 offset;
     
     Mat4f *transform;
 };
@@ -68,7 +70,7 @@ struct RendererState {
     VkSurfaceFormatKHR surface_format;
     VkPresentModeKHR present_mode;
     VkSwapchainKHR swapchain;
-    uint32_t swapchain_image_count;
+    u32 swapchain_image_count;
     VkImage* swapchain_images;
     VkImageView* swapchain_image_views;
     VkExtent2D swapchain_extent;
@@ -76,7 +78,9 @@ struct RendererState {
     bool skip_image;
     VkSemaphore* present_semaphores;
     VkSemaphore* acquire_semaphores;
-    VkFence* fences;
+    u32 current_semaphore_index;
+    VkFence* submit_fences;
+    VkFence* acquire_fences;
     VkCommandPool command_pool;
     VkPipelineLayout pipeline_layout;
     VkDescriptorSetLayout descriptor_set_layouts[CountDescriptorSetLayout];
@@ -94,8 +98,8 @@ struct RendererState {
     
     CommandBufferSubmission* submissions;
     
-    uint32_t last_image_index;
-    uint32_t image_index;
+    u32 last_image_index;
+    u32 image_index;
     ShaderCatalog shader_catalog;
     MemoryManager memory_manager;
     
@@ -108,10 +112,11 @@ struct RendererState {
     
     Entity entities[MAX_ENTITY_COUNT];
     EntityResources entity_resources;
-    uint32_t entity_count;
+    u32 entity_count;
     
     bool button_state[4];
     TemporaryStorage temporary_storage;
+    TemporaryStorage main_arena;
 };
 
 #endif

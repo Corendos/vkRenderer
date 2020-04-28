@@ -8,14 +8,14 @@
 
 const char* vk_error_code_str(VkResult result);
 bool check_queue_availability(PhysicalDeviceSelection* selection, VkSurfaceKHR surface);
-uint32_t get_device_type_score(VkPhysicalDeviceType type);
+u32 get_device_type_score(VkPhysicalDeviceType type);
 bool select_physical_device(RendererState* state);
-uint32_t get_surface_format_score(VkSurfaceFormatKHR surface_format);
+u32 get_surface_format_score(VkSurfaceFormatKHR surface_format);
 bool select_surface_format(RendererState* state);
-uint32_t get_present_mode_score(VkPresentModeKHR present_mode);
+u32 get_present_mode_score(VkPresentModeKHR present_mode);
 bool select_present_mode(RendererState* state);
 bool check_required_layers();
-bool check_required_instance_extensions(const char** extensions, uint32_t count);
+bool check_required_instance_extensions(const char** extensions, u32 count);
 bool check_required_device_extensions(VkPhysicalDevice physical_device);
 
 bool create_instance(VkInstance* instance);
@@ -25,7 +25,9 @@ bool get_swapchain_images(RendererState* state);
 bool create_swapchain_image_views(RendererState* state);
 bool create_depth_images(RendererState* state);
 bool create_semaphore(RendererState* state);
-bool create_fence(RendererState* state);
+bool create_submit_fences(RendererState* state);
+bool create_acquire_fences(RendererState* state);
+bool create_fences(RendererState* state);
 bool create_command_pool(RendererState* state);
 bool create_descriptor_set_layout(RendererState* state);
 bool create_pipeline_layout(RendererState* state);
