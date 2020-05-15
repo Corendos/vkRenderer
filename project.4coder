@@ -6,7 +6,7 @@ patterns = {
 	"*.c",
 	"*.cpp",
 	"*.h",
-	"*.hpp",
+	"*.h",
 	"*.m",
 	"*.bat",
 	"*.sh",
@@ -118,15 +118,57 @@ command_list = {
 		.cursor_at_end = true,
 		.cmd = {
 			{
-				"./bin/Debug/vk_renderer",
+				"./bin/Release/vk_renderer",
 				.os = "win"
 			},
             {
-				"./bin/Debug/vk_renderer",
+				"./bin/Release/vk_renderer",
 				.os = "linux"
 			},
             {
-				"./bin/Debug/vk_renderer",
+				"./bin/Release/vk_renderer",
+				.os = "mac"
+			},
+		},
+	},
+	{
+		.name = "Build Test",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cursor_at_end = true,
+		.cmd = {
+			{
+				"./build_test.bat",
+				.os = "win"
+			},
+            {
+				"./build_test.sh",
+				.os = "linux"
+			},
+            {
+				"./build_test.sh",
+				.os = "mac"
+			},
+		},
+	},
+	{
+		.name = "Run Test",
+		.out = "*run*",
+		.footer_panel = false,
+		.save_dirty_files = false,
+		.cursor_at_end = true,
+		.cmd = {
+			{
+				"./bin/Test/main",
+				.os = "win"
+			},
+            {
+				"./bin/Test/main",
+				.os = "linux"
+			},
+            {
+				"./bin/Test/main",
 				.os = "mac"
 			},
 		},
@@ -137,3 +179,5 @@ fkey_command[1] = "Build Debug";
 fkey_command[2] = "Run Debug";
 fkey_command[3] = "Build Release";
 fkey_command[4] = "Run Release";
+fkey_command[5] = "Build Test";
+fkey_command[6] = "Run Test";

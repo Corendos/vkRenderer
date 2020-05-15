@@ -8,3 +8,4 @@ This project is voluntarily not written in modern C++. My motivation for this ch
 
 ## Screenshots
 ![renderer_1](screenshots/renderer_1.png)
+![renderer_2](screenshots/renderer_2.png)

@@ -7,43 +7,66 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "cg_types.h"
+
+#include "cg_benchmark.h"
+#include "cg_camera.h"
+#include "cg_color.h"
+#include "cg_files.h"
+#include "cg_fonts.h"
+#include "cg_gui.h"
+#include "cg_hash.h"
+#include "cg_input.h"
+#include "cg_macros.h"
+#include "cg_memory.h"
+#include "cg_renderer.h"
+#include "cg_shaders.h"
+#include "cg_string.h"
+#include "cg_memory_arena.h"
+#include "cg_texture.h"
+#include "cg_temporary_memory.h"
+#include "cg_timer.h"
+#include "cg_utils.h"
+#include "cg_vk_helper.h"
+#include "cg_window.h"
+#include "cg_window_user_data.h"
+
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#undef STB_IMAGE_IMPLEMENTATION
 
-#include "types.hpp"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+#undef STB_IMAGE_WRITE_IMPLEMENTATION
 
-#include "benchmark.hpp"
-#include "camera.hpp"
-#include "color.hpp"
-#include "gui.hpp"
-#include "hash.hpp"
-#include "input.hpp"
-#include "macros.hpp"
-#include "memory.hpp"
-#include "renderer.hpp"
-#include "shaders.hpp"
-#include "temporary_storage.hpp"
-#include "texture.hpp"
-#include "timer.hpp"
-#include "utils.hpp"
-#include "vk_helper.hpp"
-#include "window.hpp"
-#include "window_user_data.hpp"
+#define STB_RECT_PACK_IMPLEMENTATION
+#include "stb_rect_pack.h"
+#undef STB_RECT_PACK_IMPLEMENTATION
 
-#include "benchmark.cpp"
-#include "color.cpp"
-#include "gui.cpp"
-#include "hash.cpp"
-#include "input.cpp"
-#include "math.cpp"
-#include "memory.cpp"
-#include "shaders.cpp"
-#include "temporary_storage.cpp"
-#include "texture.cpp"
-#include "timer.cpp"
-#include "utils.cpp"
-#include "vk_helper.cpp"
-#include "window.cpp"
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+#undef STB_TRUETYPE_IMPLEMENTATION
+
+
+#include "cg_benchmark.cpp"
+#include "cg_color.cpp"
+#include "cg_files.cpp"
+#include "cg_fonts.cpp"
+#include "cg_gui.cpp"
+#include "cg_hash.cpp"
+#include "cg_input.cpp"
+#include "cg_math.cpp"
+#include "cg_memory.cpp"
+#include "cg_shaders.cpp"
+#include "cg_string.cpp"
+#include "cg_memory_arena.cpp"
+#include "cg_texture.cpp"
+#include "cg_temporary_memory.cpp"
+#include "cg_timer.cpp"
+#include "cg_utils.cpp"
+#include "cg_vk_helper.cpp"
+#include "cg_window.cpp"
 
 
 struct FpsCounter {
@@ -53,33 +76,14 @@ struct FpsCounter {
     u32 frame_count;
 };
 
-const char* get_device_type_str(VkPhysicalDeviceType type) {
-    switch (type) {
-        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-        return "VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU";
-        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-        return "VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU";
-        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-        return "VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU";
-        case VK_PHYSICAL_DEVICE_TYPE_CPU:
-        return "VK_PHYSICAL_DEVICE_TYPE_CPU";
-        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
-        default:
-        return "VK_PHYSICAL_DEVICE_TYPE_OTHER";
-    }
-}
-
 struct Time {
     u64 start;
     u64 end;
-    f32 delta_time;
-    f32 cumulated_time;
+    f64 delta_time;
+    f64 cumulated_time;
 };
 
-void do_input(RendererState* state, Input* input) {
-    reset_input(input);
-    glfwPollEvents();
-    
+inline void do_mouse_input(RendererState* state, Input* input) {
     f64 last_mouse_x = input->mouse_x;
     f64 last_mouse_y = input->mouse_y;
     
@@ -93,11 +97,19 @@ void do_input(RendererState* state, Input* input) {
     }
     
     if (state->cursor_locked) {
-        glfwSetCursorPos(state->window, state->swapchain_extent.width / 2, state->swapchain_extent.height / 2);
+        glfwSetCursorPos(state->window,
+                         state->swapchain_extent.width / 2,
+                         state->swapchain_extent.height / 2);
     }
 }
 
-void update_fps_counter(GLFWwindow* window, FpsCounter* fps_counter) {
+inline void do_input(RendererState* state, Input* input) {
+    reset_input(input);
+    glfwPollEvents();
+    do_mouse_input(state, input);
+}
+
+inline void update_fps_counter(RendererState* state, GLFWwindow* window, FpsCounter* fps_counter) {
     fps_counter->end = get_time_ns();
     u64 last_start = fps_counter->start;
     fps_counter->start = get_time_ns();
@@ -105,33 +117,39 @@ void update_fps_counter(GLFWwindow* window, FpsCounter* fps_counter) {
     fps_counter->cumulated_frame_duration += fps_counter->end - last_start;
     fps_counter->frame_count++;
     
-    if (fps_counter->frame_count == 1000) {
+    TemporaryMemory temporary_memory = make_temporary_memory(&state->main_arena);
+    
+    if (fps_counter->frame_count == 100) {
         f64 average_frame_duration = (f64)fps_counter->cumulated_frame_duration / (f64)fps_counter->frame_count;
         average_frame_duration /= 1000000000.0;
         
         fps_counter->frame_count = 0;
         fps_counter->cumulated_frame_duration = 0;
         
-        char temp[1000] = {};
+        String temp = push_string(&temporary_memory, 1000);
         
-        sprintf(temp, "%f fps", 1.0 / average_frame_duration);
-        glfwSetWindowTitle(window, temp);
+        string_format(temp, "%f fps", 1.0 / average_frame_duration);
+        glfwSetWindowTitle(window, temp.str);
     }
+    
+    char* data = (char*)allocate(&temporary_memory, 100000000);
+    
+    destroy_temporary_memory(&temporary_memory);
 }
 
 
-bool handle_swapchain_recreation(RendererState* state, WindowUserData* window_user_data) {
+inline bool handle_swapchain_recreation(RendererState* state, WindowUserData* window_user_data) {
     if (window_user_data->swapchain_need_recreation) {
         // Wait for the last frame in flight to be ready
         VkResult result = vkQueueWaitIdle(state->graphics_queue);
         if (result != VK_SUCCESS) {
-            printf("vkQueueWaitIdle returned (%s)\n", vk_error_code_str(result));
+            println("vkQueueWaitIdle returned (%s)", vk_error_code_str(result));
             return false;
         }
         
         result = vkQueueWaitIdle(state->present_queue);
         if (result != VK_SUCCESS) {
-            printf("vkQueueWaitIdle returned (%s)\n", vk_error_code_str(result));
+            println("vkQueueWaitIdle returned (%s)", vk_error_code_str(result));
             return false;
         }
         
@@ -139,50 +157,49 @@ bool handle_swapchain_recreation(RendererState* state, WindowUserData* window_us
         destroy_semaphores(state);
         destroy_framebuffers(state);
         destroy_pipeline(state);
-        destroy_gui_pipeline(state);
+        destroy_gui_pipeline(&state->gui_resources, state);
         destroy_depth_images(state);
         
         if (!create_swapchain(state)) {
-            printf("Failed to recreate swapchain\n");
+            println("Failed to recreate swapchain");
             return false;
         }
         
         free_null(state->swapchain_images);
         if (!get_swapchain_images(state)) {
-            printf("Failed to get swapchain images\n");
+            println("Failed to get swapchain images");
             return false;
         }
         
         destroy_swapchain_image_views(state);
         if (!create_swapchain_image_views(state)) {
-            printf("Failed to create swapchain image views\n");
+            println("Failed to create swapchain image views");
             return false;
         }
         
         if (!create_depth_images(state)) {
-            printf("Failed to create depth image\n");
+            println("Failed to create depth image");
             return false;
         }
         
         if (!create_semaphore(state)) {
-            printf("Failed to create semaphore\n");
+            println("Failed to create semaphore");
             return false;
         }
         
         if(!create_graphics_pipeline(state)) {
-            printf("Failed to recreate pipeline\n");
+            println("Failed to recreate pipeline");
         }
         
-        if(!create_gui_graphics_pipeline(state)) {
-            printf("Failed to recreate gui pipeline\n");
+        if(!create_gui_pipeline(&state->gui_resources, state)) {
+            println("Failed to recreate gui pipeline");
         }
         
         if(!create_framebuffers(state)) {
-            printf("Failed to recreate framebuffers\n");
+            println("Failed to recreate framebuffers");
         }
         
         window_user_data->swapchain_need_recreation = false;
-        state->last_image_index = state->swapchain_image_count - 1;
         
         state->camera.aspect = (f32)state->swapchain_extent.width / (f32)state->swapchain_extent.height;
         state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
@@ -195,7 +212,7 @@ bool handle_swapchain_recreation(RendererState* state, WindowUserData* window_us
 }
 
 
-bool create_entity(RendererState* state, Vertex* vertex_buffer, u32 vertex_buffer_size, u32* entity_id) {
+inline bool create_entity(RendererState* state, Vertex* vertex_buffer, u32 vertex_buffer_size, u32* entity_id) {
     if (state->entity_count == MAX_ENTITY_COUNT) return false;
     
     u32 buffer_size = vertex_buffer_size * sizeof(Vertex);
@@ -212,7 +229,7 @@ bool create_entity(RendererState* state, Vertex* vertex_buffer, u32 vertex_buffe
     
     VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &entity->buffer);
     if (result != VK_SUCCESS) {
-        printf("vkCreateBuffer returned (%s)\n", vk_error_code_str(result));
+        println("vkCreateBuffer returned (%s)", vk_error_code_str(result));
         return false;
     }
     
@@ -228,7 +245,7 @@ bool create_entity(RendererState* state, Vertex* vertex_buffer, u32 vertex_buffe
     
     result = vkBindBufferMemory(state->device, entity->buffer, entity->allocation.device_memory, entity->allocation.offset);
     if (result != VK_SUCCESS) {
-        printf("vkBindBufferMemory returned (%s)\n", vk_error_code_str(result));
+        println("vkBindBufferMemory returned (%s)", vk_error_code_str(result));
         return false;
     }
     
@@ -245,7 +262,7 @@ bool create_entity(RendererState* state, Vertex* vertex_buffer, u32 vertex_buffe
     return true;
 }
 
-bool create_square_entity(RendererState* state) {
+inline bool create_square_entity(RendererState* state) {
     f32 z = 0.0f;
     Vertex vertex_buffer[6] = {};
     vertex_buffer[0].position = new_vec3f(-0.5, -0.5, z);
@@ -267,7 +284,7 @@ bool create_square_entity(RendererState* state) {
     return create_entity(state, vertex_buffer, array_size(vertex_buffer), &entity_id);
 }
 
-void create_cube(Vec3f size, Vertex* vertices) {
+inline void create_cube(Vec3f size, Vertex* vertices) {
     // Front face
     vertices[ 0].position = new_vec3f(-size.x, -size.y,  size.z);
     vertices[ 1].position = new_vec3f(-size.x,  size.y,  size.z);
@@ -365,19 +382,19 @@ void create_cube(Vec3f size, Vertex* vertices) {
     vertices[35].color = new_vec3f(0.0f, 1.0f, 1.0f);
 }
 
-Mat4f random_translation_matrix(f32 range) {
+inline Mat4f random_translation_matrix(f32 range) {
     return translation_matrix(2.0f * randf() * range - range,
                               2.0f * randf() * range - range,
                               2.0f * randf() * range - range);
 }
 
-Mat4f random_rotation_matrix() {
+inline Mat4f random_rotation_matrix() {
     return rotation_matrix(2.0f * PI * randf(),
                            2.0f * PI * randf(),
                            2.0f * PI * randf());
 }
 
-bool create_cube_entity(RendererState* state) {
+inline bool create_cube_entity(RendererState* state) {
     Vertex vertex_buffer[36] = {};
     create_cube(new_vec3f(0.2f, 0.2f, 0.2f), vertex_buffer);
     
@@ -396,7 +413,7 @@ bool create_cube_entity(RendererState* state) {
     return true;
 }
 
-bool allocate_camera_descriptor_sets(RendererState* state) {
+inline bool allocate_camera_descriptor_sets(RendererState* state) {
     state->camera_resources.descriptor_sets = (VkDescriptorSet*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSet));
     
     VkDescriptorSetLayout* layouts;
@@ -413,7 +430,7 @@ bool allocate_camera_descriptor_sets(RendererState* state) {
     
     VkResult result = vkAllocateDescriptorSets(state->device, &allocate_info, state->camera_resources.descriptor_sets);
     if (result != VK_SUCCESS) {
-        printf("vkAllocateDescriptorSets returned (%s)\n", vk_error_code_str(result));
+        println("vkAllocateDescriptorSets returned (%s)", vk_error_code_str(result));
         return false;
         free_null(layouts);
     }
@@ -423,7 +440,7 @@ bool allocate_camera_descriptor_sets(RendererState* state) {
     return true;
 }
 
-bool create_camera_buffers(RendererState* state) {
+inline bool create_camera_buffers(RendererState* state) {
     state->camera_resources.buffers     = (VkBuffer*)            calloc(state->swapchain_image_count, sizeof(VkBuffer));
     state->camera_resources.allocations = (AllocatedMemoryChunk*)calloc(state->swapchain_image_count, sizeof(AllocatedMemoryChunk));
     
@@ -438,7 +455,7 @@ bool create_camera_buffers(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
         VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->camera_resources.buffers[i]);
         if (result != VK_SUCCESS) {
-            printf("vkCreateBuffer returned (%s)\n", vk_error_code_str(result));
+            println("vkCreateBuffer returned (%s)", vk_error_code_str(result));
             return false;
         }
         
@@ -454,7 +471,7 @@ bool create_camera_buffers(RendererState* state) {
         
         result = vkBindBufferMemory(state->device, state->camera_resources.buffers[i], state->camera_resources.allocations[i].device_memory, state->camera_resources.allocations[i].offset);
         if (result != VK_SUCCESS) {
-            printf("vkBindBufferMemory returned (%s)",vk_error_code_str(result));
+            println("vkBindBufferMemory returned (%s)",vk_error_code_str(result));
             return false;
         }
         
@@ -464,7 +481,7 @@ bool create_camera_buffers(RendererState* state) {
     return true;
 }
 
-void update_camera_descriptor_set(RendererState* state) {
+inline void update_camera_descriptor_set(RendererState* state) {
     VkDescriptorBufferInfo* buffer_info;
     
     buffer_info = (VkDescriptorBufferInfo*)calloc(state->swapchain_image_count, sizeof(VkDescriptorBufferInfo));
@@ -495,12 +512,12 @@ void update_camera_descriptor_set(RendererState* state) {
     free_null(writes);
 }
 
-bool init_camera(RendererState* state) {
+inline bool init_camera(RendererState* state) {
     state->camera.fov = 70.0f;
     state->camera.position = new_vec3f(0.0f, 0.0f, 0.0f);
     state->camera.yaw = -PI_2;
     state->camera.pitch = 0.0f;
-    state->camera.speed = 0.001f;
+    state->camera.speed = 0.0015f;
     state->camera.aspect = (f32)state->swapchain_extent.width / (f32)state->swapchain_extent.height;
     
     state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
@@ -519,7 +536,7 @@ bool init_camera(RendererState* state) {
     return true;
 }
 
-bool create_entity_buffers(RendererState* state) {
+inline bool create_entity_buffers(RendererState* state) {
     state->entity_resources.buffers = (VkBuffer*)calloc(state->swapchain_image_count, sizeof(VkBuffer));
     state->entity_resources.allocations = (AllocatedMemoryChunk*)calloc(state->swapchain_image_count, sizeof(AllocatedMemoryChunk));
     
@@ -534,7 +551,7 @@ bool create_entity_buffers(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
         VkResult result = vkCreateBuffer(state->device, &create_info, nullptr, &state->entity_resources.buffers[i]);
         if (result != VK_SUCCESS) {
-            printf("vkCreateBuffer returned (%s)\n", vk_error_code_str(result));
+            println("vkCreateBuffer returned (%s)", vk_error_code_str(result));
             return false;
         }
         
@@ -550,7 +567,7 @@ bool create_entity_buffers(RendererState* state) {
         
         result = vkBindBufferMemory(state->device, state->entity_resources.buffers[i], state->entity_resources.allocations[i].device_memory, state->entity_resources.allocations[i].offset);
         if (result != VK_SUCCESS) {
-            printf("vkBindBufferMemory returned (%s)\n", vk_error_code_str(result));
+            println("vkBindBufferMemory returned (%s)", vk_error_code_str(result));
             return false;
         }
     }
@@ -558,7 +575,7 @@ bool create_entity_buffers(RendererState* state) {
     return true;
 }
 
-bool create_entity_descriptor_sets(RendererState* state) {
+inline bool create_entity_descriptor_sets(RendererState* state) {
     state->entity_resources.descriptor_sets = (VkDescriptorSet*)calloc(state->swapchain_image_count, sizeof(VkDescriptorSet));
     
     VkDescriptorSetLayout* layouts;
@@ -575,7 +592,7 @@ bool create_entity_descriptor_sets(RendererState* state) {
     
     VkResult result = vkAllocateDescriptorSets(state->device, &allocate_info, state->entity_resources.descriptor_sets);
     if (result != VK_SUCCESS) {
-        printf("vkAllocateDescriptorSets returned (%s)\n", vk_error_code_str(result));
+        println("vkAllocateDescriptorSets returned (%s)", vk_error_code_str(result));
         return false;
         free_null(layouts);
     }
@@ -585,7 +602,7 @@ bool create_entity_descriptor_sets(RendererState* state) {
     return true;
 }
 
-void update_entity_descriptor_sets(RendererState* state) {
+inline void update_entity_descriptor_sets(RendererState* state) {
     VkDescriptorBufferInfo* buffer_info;
     
     buffer_info = (VkDescriptorBufferInfo*)calloc(state->swapchain_image_count, sizeof(VkDescriptorBufferInfo));
@@ -616,14 +633,14 @@ void update_entity_descriptor_sets(RendererState* state) {
     free_null(writes);
 }
 
-bool init_entities(RendererState* state) {
+inline bool init_entities(RendererState* state) {
     if (!create_entity_buffers(state)) {
-        printf("Error: failed to create entity buffers\n");
+        println("Error: failed to create entity buffers");
         return false;
     }
     
     if (!create_entity_descriptor_sets(state)) {
-        printf("Error: failed to create entity descriptor sets\n");
+        println("Error: failed to create entity descriptor sets");
         return false;
     }
     
@@ -632,57 +649,43 @@ bool init_entities(RendererState* state) {
     return true;
 }
 
-bool init(RendererState* state, WindowUserData* window_user_data) {
-    if (!init_temporary_storage(&state->temporary_storage)) {
-        printf("Error: failed to initialize temporary_storage\n");
-        return false;
-    } else {
-        printf("temporary_storage init : success\n");
-    }
-    
-    if (!init_temporary_storage(&state->main_arena, MAIN_ARENA_SIZE)) {
-        printf("Error: failed to initialize main arena\n");
-        return false;
-    } else {
-        printf("main arena init : success\n");
-    }
-    
+inline bool init_renderer(RendererState* state) {
     if (!glfwInit()) {
-        printf("Error: failed to initialize glfw library\n");
+        println("Error: failed to initialize glfw library");
         return false;
     } else {
-        printf("glfw init: success\n");
+        println("glfw init: success");
     }
     
     if (!glfwVulkanSupported()) {
-        printf("Vulkan is not supported\n");
+        println("Vulkan is not supported");
         return false;
     } else {
-        printf("vulkan: supported\n");
+        println("vulkan: supported");
     }
     
     if (!create_instance(&state->instance)) {
         return false;
     } else {
-        printf("instance init: success\n");
+        println("instance init: success");
     }
     
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     state->window = glfwCreateWindow(1280, 720, "vkRenderer", nullptr, nullptr);
     
     if (!state->window) {
-        printf("Error: failed to create window\n");
+        println("Error: failed to create window");
         return false;
     } else {
-        printf("window init: success\n");
+        println("window init: success");
     }
     
     VkResult result = glfwCreateWindowSurface(state->instance, state->window, nullptr, &state->surface);
     if(result != VK_SUCCESS) {
-        printf("Error: failed to create window surface (%s)\n", vk_error_code_str(result));
+        println("Error: failed to create window surface (%s)", vk_error_code_str(result));
         return false;
     } else {
-        printf("surface init: success\n");
+        println("surface init: success");
     }
     
     u32 extension_count = 0;
@@ -691,27 +694,27 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
     if (!check_required_instance_extensions(required_instance_extensions, extension_count)) {
         return false;
     } else {
-        printf("required extensions: supported\n");
+        println("required extensions: supported");
     }
     
     if (!select_physical_device(state)) {
-        printf("Error: failed to select a physical device.\n");
+        println("Error: failed to select a physical device.");
         return false;
     } else {
-        printf("physical device selection: success\n");
+        println("physical device selection: success");
     }
     
     if (!check_required_device_extensions(state->selection.device)) {
         return false;
     } else {
-        printf("required device extensions: supported\n");
+        println("required device extensions: supported");
     }
     
     if (!create_device_and_queues(state)) {
-        printf("Error: failed to create the device.\n");
+        println("Error: failed to create the device.");
         return false;
     } else {
-        printf("device and queues init: success\n");
+        println("device and queues init: success");
     }
     
     u32 allocation_size = MB(128);
@@ -720,7 +723,7 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
     if (!init_memory(&state->memory_manager, allocation_size, min_page_size, state->selection.device)) {
         return false;
     } else {
-        printf("memory manager init: success\n");
+        println("memory manager init: success");
     }
     
     if (!select_surface_format(state)) {
@@ -734,19 +737,19 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
     if (!create_swapchain(state)) {
         return false;
     } else {
-        printf("swapchain init: success\n");
+        println("swapchain init: success");
     }
     
     if (!get_swapchain_images(state)) {
         return false;
     } else {
-        printf("swapchain images init: success\n");
+        println("swapchain images init: success");
     }
     
     if (!create_depth_images(state)) {
         return false;
     } else {
-        printf("depth images init: success\n");
+        println("depth images init: success");
     }
     
     if (!create_semaphore(state)) {
@@ -760,91 +763,140 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
     if (!create_command_pool(state)) {
         return false;
     } else {
-        printf("command pool init: success\n");
+        println("command pool init: success");
     }
     
     if (!create_swapchain_image_views(state)) {
         return false;
     } else {
-        printf("swapchain image view init: success\n");
+        println("swapchain image view init: success");
     }
     
-    if (!init_shader_catalog(64, &state->shader_catalog)) {
+    if (!init_shader_catalog(&state->shader_catalog, 64)) {
         return false;
     } else {
-        printf("shader catalog init: success\n");
+        println("shader catalog init: success");
     }
     
     if (!load_shader_module("resources/shaders/basic.vert.spv", "basic.vert", state->device, &state->shader_catalog)) {
         return false;
     } else {
-        printf("basic vertex shader init: success\n");
+        println("basic vertex shader init: success");
     }
     
     if (!load_shader_module("resources/shaders/basic.frag.spv", "basic.frag", state->device, &state->shader_catalog)) {
         return false;
     } else {
-        printf("basic fragment shader init: success\n");
+        println("basic fragment shader init: success");
     }
     
     if (!load_shader_module("resources/shaders/gui.vert.spv", "gui.vert", state->device, &state->shader_catalog)) {
         return false;
     } else {
-        printf("gui vertex shader init: success\n");
+        println("gui vertex shader init: success");
     }
     
     if (!load_shader_module("resources/shaders/gui.frag.spv", "gui.frag", state->device, &state->shader_catalog)) {
         return false;
     } else {
-        printf("gui fragment shader init: success\n");
+        println("gui fragment shader init: success");
     }
     
     if (!create_descriptor_set_layout(state)) {
         return false;
     } else {
-        printf("descriptor set layout init: success\n");
+        println("descriptor set layout init: success");
     }
     
     if (!create_descriptor_pool(state)) {
         return false;
     } else {
-        printf("descriptor pool init: success\n");
+        println("descriptor pool init: success");
     }
     
     if (!create_pipeline_layout(state)) {
         return false;
     } else {
-        printf("pipeline layout init: success\n");
+        println("pipeline layout init: success");
     }
     
     if (!create_render_pass(state)) {
         return false;
     } else {
-        printf("render pass init: success\n");
+        println("render pass init: success");
     }
     
     if (!create_graphics_pipeline(state)) {
         return false;
     } else {
-        printf("graphics pipeline init: success\n");
-    }
-    
-    if (!create_gui_graphics_pipeline(state)) {
-        return false;
-    } else {
-        printf("gui pipeline init: success\n");
+        println("graphics pipeline init: success");
     }
     
     if (!create_framebuffers(state)) {
         return false;
     } else {
-        printf("framebuffers init: success\n");
+        println("framebuffers init: success");
     }
     
-    if (!init_texture_catalog(state, 32)) {
+    return true;
+}
+
+inline bool init_font(RendererState* state) {
+    if (!init_font_catalog(&state->font_catalog, 32, &state->main_arena)) {
         return false;
     } else {
-        printf("texture catalog init: success\n");
+        println("font catalog init: success");
+    }
+    
+    ConstString font_name = make_literal_string("ubuntu");
+    
+    String font_file_path = push_string(&state->temporary_storage, 256);
+    string_format(font_file_path, "%s/resources/fonts/UbuntuMono-R.ttf", PROGRAM_ROOT);
+    
+    ConstString const_font_file_path = make_const_string(&font_file_path);
+    
+    if (!load_and_add_font_to_catalog(&state->font_catalog, &font_name, &const_font_file_path, &state->main_arena)) {
+        return false;
+    } else {
+        println("loading '%s' font: success", font_name.str);
+    }
+    
+    if (!init_font_atlas_catalog(&state->font_atlas_catalog, state->gui_resources.font_atlas_slot_count, state, &state->main_arena)) {
+        return false;
+    } else {
+        println("init font atlas catalog : success");
+    }
+    
+    u32 font_sizes[] = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 30};
+    
+    if (!create_and_add_font_atlases(&state->font_catalog, &font_name, font_sizes, array_size(font_sizes), &state->font_atlas_catalog, 32, 95, state, &state->main_arena)) {
+        return false;
+    } else {
+        println("create font atlases: success");
+    }
+    
+    return true;
+}
+
+inline bool init(RendererState* state, WindowUserData* window_user_data) {
+    if (!init_memory_arena(&state->temporary_storage)) {
+        println("Error: failed to initialize temporary_storage");
+        return false;
+    } else {
+        println("temporary_storage init : success");
+    }
+    
+    if (!init_memory_arena(&state->main_arena, MAIN_ARENA_SIZE)) {
+        println("Error: failed to initialize main arena");
+        return false;
+    } else {
+        println("main arena init : success");
+    }
+    
+    if (!init_renderer(state)) {
+        return false;
+    } else {
+        println("renderer init: success");
     }
     
     Vec2f screen_size = {};
@@ -853,32 +905,43 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
     if (!init_gui(&state->gui_state, &state->gui_resources, state)) {
         return false;
     } else {
-        printf("gui init: success\n");
+        println("gui init: success");
+    }
+    
+    if (!init_texture_catalog(&state->texture_catalog, 32, state)) {
+        return false;
+    } else {
+        println("texture catalog init: success");
+    }
+    
+    if (!init_font(state)) {
+        return false;
+    } else {
+        println("font init: success");
     }
     
     if (!init_camera(state)) {
         return false;
     } else {
-        printf("camera init : success\n");
+        println("camera init : success");
     }
     
     if (!init_entities(state)) {
         return false;
     } else {
-        printf("entities init : success\n");
+        println("entities init : success");
     }
     
     for (int i = 0;i < 10;++i) {
         if (!create_cube_entity(state)) {
             return false;
         } else {
-            printf("cube entity %d init : success\n", i);
+            println("cube entity %d init : success", i);
         }
     }
     
     glfwSetWindowUserPointer(state->window, window_user_data);
     glfwSetKeyCallback(state->window, key_callback);
-    //glfwSetCursorPosCallback(state->window, mouse_position_callback);
     glfwSetMouseButtonCallback(state->window, mouse_button_callback);
     glfwSetWindowSizeCallback(state->window, window_resize_callback);
     glfwSetFramebufferSizeCallback(state->window, framebuffer_resize_callback);
@@ -887,52 +950,53 @@ bool init(RendererState* state, WindowUserData* window_user_data) {
     glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPos(state->window, state->swapchain_extent.width / 2, state->swapchain_extent.height / 2);
     
-    state->image_index = 0;
-    state->last_image_index = state->swapchain_image_count - 1;
-    
     return true;
 }
 
-bool wait_for_acquire_fence(RendererState* state) {
-    VkResult result = vkWaitForFences(state->device, 1, &state->acquire_fences[state->current_semaphore_index], VK_TRUE, 1000000000);
+inline bool wait_for_acquire_fence(RendererState* state) {
+    VkResult result = vkWaitForFences(state->device,
+                                      1,
+                                      &state->acquire_fences[state->current_semaphore_index],
+                                      VK_TRUE,
+                                      1000000000);
     if (result != VK_SUCCESS) {
-        printf("vkWaitForFences returned (%s)\n", vk_error_code_str(result));
+        println("vkWaitForFences returned (%s)", vk_error_code_str(result));
         return false;
     }
     
     result = vkResetFences(state->device, 1, &state->acquire_fences[state->current_semaphore_index]);
     if (result != VK_SUCCESS) {
-        printf("vkResetFences returned (%s)\n", vk_error_code_str(result));
+        println("vkResetFences returned (%s)", vk_error_code_str(result));
         return false;
     }
     
     return true;
 }
 
-bool wait_for_submit_fence(RendererState* state) {
+inline bool wait_for_submit_fence(RendererState* state) {
     VkResult result = vkWaitForFences(state->device, 1, state->submissions[state->image_index].fence, VK_TRUE, 1000000000);
     if (result != VK_SUCCESS) {
-        printf("vkWaitForFences returned (%s)\n", vk_error_code_str(result));
+        println("vkWaitForFences returned (%s)", vk_error_code_str(result));
         return false;
     }
     
     result = vkResetFences(state->device, 1, state->submissions[state->image_index].fence);
     if (result != VK_SUCCESS) {
-        printf("vkResetFences returned (%s)\n", vk_error_code_str(result));
+        println("vkResetFences returned (%s)", vk_error_code_str(result));
         return false;
     }
     
     return true;
 }
 
-void update_time(Time* time) {
+inline void update_time(Time* time) {
     time->end = get_time_ns();
-    time->delta_time = (f32)(time->end - time->start) / 1e9f;
+    time->delta_time = (f64)(time->end - time->start) / (f64)1e9;
     time->cumulated_time += time->delta_time;
     time->start = get_time_ns();
 }
 
-void update_camera(RendererState* state, Input* input, Time* time) {
+inline void update_camera(RendererState* state, Input* input, Time* time) {
     if (state->cursor_locked) {
         state->camera.yaw -= input->mouse_delta_x * state->camera.speed;
         state->camera.pitch += input->mouse_delta_y * state->camera.speed;
@@ -963,54 +1027,133 @@ void update_camera(RendererState* state, Input* input, Time* time) {
         move_vector = move_vector - side;
     }
     
+    f64 delta_time = time->delta_time;
+    
     move_vector = normalize(&move_vector);
-    move_vector.x = move_vector.x * 1.0f * time->delta_time;
-    move_vector.y = move_vector.y * 1.0f * time->delta_time;
-    move_vector.z = move_vector.z * 1.0f * time->delta_time;
+    move_vector.x = move_vector.x * 1.0f * delta_time;
+    move_vector.y = move_vector.y * 1.0f * delta_time;
+    move_vector.z = move_vector.z * 1.0f * delta_time;
     
     state->camera.position = state->camera.position + move_vector;
     state->camera.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
 }
 
-void update_entities(RendererState* state) {
+inline void update_entities(RendererState* state) {
     memcpy(state->entity_resources.allocations[state->image_index].data, state->entity_resources.transforms, state->entity_count * sizeof(Mat4f));
 }
 
-void update_gui(RendererState* state, Input* input) {
-    reset_gui(&state->gui_state);
+inline void update_gui_funk(RendererState* state, Input* input) {
+    ConstString font_name = make_literal_string("ubuntu");
+    FontAtlas* font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, 20);
+    assert(font_atlas != 0);
     
-    u32 button_height = 40;
-    u32 button_width  = 200;
+    char text[101];
+    String string = make_string(text, 100);
     
-    u32 y_offset = button_height + 10;
-    u32 current_offset = 10;
+    // Top Line
+    u32 font_size = 30;
+    f32 pos_x = 0;
+    f32 pos_y = 0;
+    string_format(string, "TopLeft");
+    ConstString const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 30, 30), TextAnchor::TopLeft, font_atlas);
     
-    for (u32 i = 0;i < 4;++i) {
-        bool button_pressed = draw_button(&state->gui_state, input,
-                                          state->button_state[i],
-                                          current_offset, 10,
-                                          current_offset + button_height, 10 + button_width,
-                                          new_coloru(255, 0, 0, 127),
-                                          new_coloru(255, 77, 77, 127),
-                                          new_coloru(128, 0, 0, 127));
-        if(button_pressed) {
-            state->button_state[i] = true;
-        } else {
-            if (state->button_state[i]) {
-                printf("Pressed the button %d !\n", i);
-            }
-            state->button_state[i] = false;
-        }
-        
-        current_offset += y_offset;
-    }
+    font_size = 30;
+    pos_x = state->swapchain_extent.width / 2;
+    pos_y = 0;
+    string_format(string, "TopMiddle");
+    const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 255, 30), TextAnchor::TopMiddle, font_atlas);
+    
+    font_size = 30;
+    pos_x = state->swapchain_extent.width;
+    pos_y = 0;
+    string_format(string, "TopRight");
+    const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 30, 255), TextAnchor::TopRight, font_atlas);
+    
+    // Centered Line
+    font_size = 20;
+    pos_x = 0;
+    pos_y = state->swapchain_extent.height / 2;
+    string_format(string, "MiddleLeft");
+    const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 255, 30), TextAnchor::MiddleLeft, font_atlas);
+    
+    font_size = 20;
+    pos_x = state->swapchain_extent.width / 2;
+    pos_y = state->swapchain_extent.height / 2;
+    string_format(string, "Center");
+    const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 30, 255), TextAnchor::Center, font_atlas);
+    
+    font_size = 20;
+    pos_x = state->swapchain_extent.width;
+    pos_y = state->swapchain_extent.height / 2;
+    string_format(string, "MiddleRight");
+    const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 255, 255), TextAnchor::MiddleRight, font_atlas);
+    
+    
+    // Bottom line
+    font_size = 10;
+    pos_x = 0;
+    pos_y = state->swapchain_extent.height;
+    string_format(string, "BottomLeft");
+    const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 255, 255), TextAnchor::BottomLeft, font_atlas);
+    
+    font_size = 10;
+    pos_x = state->swapchain_extent.width / 2;
+    pos_y = state->swapchain_extent.height;
+    string_format(string, "BottomMiddle");
+    const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 30, 30), TextAnchor::BottomMiddle, font_atlas);
+    
+    font_size = 10;
+    pos_x = state->swapchain_extent.width;
+    pos_y = state->swapchain_extent.height;
+    string_format(string, "BottomRight");
+    const_string = make_const_string(&string);
+    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 255, 255), TextAnchor::BottomRight, font_atlas);
+}
+
+inline void update_gui(RendererState* state, Input* input) {
+    reset_gui(&state->gui_state, &state->gui_resources);
+    
+#if 0
+    draw_button(&state->gui_state, input,
+                false,
+                10, 10,
+                10 + 30, 10 + 200,
+                new_coloru(255, 0, 0),
+                new_coloru(255, 77, 77),
+                new_coloru(128, 0, 0));
+    
+    draw_button(&state->gui_state, input,
+                false,
+                50, 10,
+                50 + 30, 10 + 200,
+                new_coloru(0, 0, 255),
+                new_coloru(77, 77, 255),
+                new_coloru(0, 0, 128));
+    
+    draw_button(&state->gui_state, input,
+                false,
+                90, 10,
+                90 + 30, 10 + 200,
+                new_coloru(0, 255, 0),
+                new_coloru(77, 255, 77),
+                new_coloru(0, 128, 0));
+#endif
+    
+    update_gui_funk(state, input);
     
     memcpy(state->gui_resources.allocations[state->image_index].data, state->gui_state.vertex_buffer, state->gui_state.current_size * sizeof(GuiVertex));
 }
 
-void update(RendererState* state, Input* input, Time* time) {
+inline void update(RendererState* state, Input* input, Time* time) {
     update_gui(state, input);
-    update_time(time);
     update_camera(state, input, time);
     update_entities(state);
     memcpy(state->camera_resources.allocations[state->image_index].data, &state->camera.context, sizeof(CameraContext));
@@ -1026,9 +1169,18 @@ void update(RendererState* state, Input* input, Time* time) {
             //glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
         }
     }
+    
+    if (input->button_just_pressed[GLFW_MOUSE_BUTTON_MIDDLE]) {
+        glfwSetWindowShouldClose(state->window, GLFW_TRUE);
+    }
+    
+    if (input->key_just_pressed[GLFW_KEY_Y]) {
+        state->counter = 0;
+        state->updater = 1;
+    }
 }
 
-VkResult render(RendererState* state) {
+inline VkResult render(RendererState* state) {
     VkCommandBuffer command_buffer = {};
     
     VkCommandBufferAllocateInfo allocate_info = {};
@@ -1039,7 +1191,7 @@ VkResult render(RendererState* state) {
     
     VkResult allocate_result = vkAllocateCommandBuffers(state->device, &allocate_info, &command_buffer);
     if (allocate_result != VK_SUCCESS) {
-        printf("vkAllocateCommandBuffers returned (%s)\n", vk_error_code_str(allocate_result));
+        println("vkAllocateCommandBuffers returned (%s)", vk_error_code_str(allocate_result));
         return allocate_result;
     }
     
@@ -1049,7 +1201,7 @@ VkResult render(RendererState* state) {
     
     VkResult result = vkBeginCommandBuffer(command_buffer, &begin_info);
     if (result != VK_SUCCESS) {
-        printf("vkBeginCommandBuffer returned (%s)\n", vk_error_code_str(result));
+        println("vkBeginCommandBuffer returned (%s)", vk_error_code_str(result));
         return result;
     }
     
@@ -1083,9 +1235,31 @@ VkResult render(RendererState* state) {
         vkCmdDraw(command_buffer, state->entities[i].size, 1, 0, 0);
     }
     
-    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->gui_pipeline);
+    // Bind the pipeline and the vertex buffer
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->gui_resources.pipeline);
     vkCmdBindVertexBuffers(command_buffer, 0, 1, &state->gui_resources.buffers[state->image_index], &offset);
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->gui_resources.pipeline_layout, 0, 1,
+                            &state->font_atlas_catalog.resources.descriptor_set, 0, nullptr);
     vkCmdDraw(command_buffer, state->gui_state.current_size, 1, 0, 0);
+#if 0
+    // NOTE: this is how I want to use the gui data to render the gui
+    
+    // Bind the pipeline and the vertex buffer
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->gui_resources.pipeline);
+    vkCmdBindVertexBuffers(command_buffer, 0, 1, &state->gui_resources.buffers[state->image_index], &offset);
+    
+    GuiDrawInfoEntry* entry = state->gui_state.draw_info_list;
+    while (entry) {
+        GuiDrawInfo* draw_info = &entry->draw_info;
+        FontAtlas* font_atlas = draw_info->font_atlas;
+        
+        vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->gui_resources.pipeline_layout, 0, 1,I
+                                &font_atlas->resources->descriptor_set, 0, nullptr);
+        vkCmdDraw(command_buffer, draw_info->count, 1, draw_info->start, 0);
+        
+        entry = entry->next;
+    }
+#endif
     
     vkCmdEndRenderPass(command_buffer);
     vkEndCommandBuffer(command_buffer);
@@ -1109,7 +1283,7 @@ VkResult render(RendererState* state) {
     
     result = vkQueueSubmit(state->graphics_queue, 1, &submit_info, *state->submissions[state->image_index].fence);
     if (result != VK_SUCCESS) {
-        printf("vkQueueSubmit returned (%s)\n", vk_error_code_str(result));
+        println("vkQueueSubmit returned (%s)", vk_error_code_str(result));
         return result;
     }
     
@@ -1124,18 +1298,17 @@ VkResult render(RendererState* state) {
     present_info.pResults = &present_result;
     
     result = vkQueuePresentKHR(state->present_queue, &present_info);
-    if (result == VK_SUCCESS) {
-        state->last_image_index = state->image_index;
-    } else if (result != VK_ERROR_OUT_OF_DATE_KHR){
-        printf("vkQueuePresentKHR returned (%s)\n", vk_error_code_str(result));
+    if (result != VK_SUCCESS && result != VK_ERROR_OUT_OF_DATE_KHR){
+        println("vkQueuePresentKHR returned (%s)", vk_error_code_str(result));
     }
     
     return present_result;
 }
 
 
-void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time) {
-    reset(&state->temporary_storage);
+inline void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time) {
+    update_time(time);
+    reset_arena(&state->temporary_storage);
     if (!handle_swapchain_recreation(state, window_user_data)) {
         state->crashed = true;
         return;
@@ -1145,10 +1318,10 @@ void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time
                                                     state->acquire_fences[state->current_semaphore_index],
                                                     &state->image_index);
     if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
-        window_user_data->swapchain_need_recreation= true;
+        window_user_data->swapchain_need_recreation = true;
         return;
     } else if (acquire_result != VK_SUCCESS) {
-        printf("vkAcquireNextImageKHR returned (%s)\n", vk_error_code_str(acquire_result));
+        println("vkAcquireNextImageKHR returned (%s)", vk_error_code_str(acquire_result));
         state->crashed = true;
     }
     
@@ -1161,9 +1334,20 @@ void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time
         return;
     }
     
-    do_input(state, window_user_data->input);
     
+    // Test with fixed timestep
+#if 0
+    while (time->cumulated_time > 1.0 / 61.0) {
+        do_input(state, window_user_data->input);
+        update(state, window_user_data->input, time);
+        time->cumulated_time -= 1.0 / 59.0;
+        if (time->cumulated_time < 0) time->cumulated_time = 0;
+    }
+#endif
+    
+    do_input(state, window_user_data->input);
     update(state, window_user_data->input, time);
+    
     
     VkResult render_result = render(state);
     if (render_result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -1175,11 +1359,14 @@ void do_frame(RendererState* state, WindowUserData* window_user_data, Time* time
     state->current_semaphore_index = (state->current_semaphore_index + 1) % state->swapchain_image_count;
 }
 
-void destroy_camera(RendererState* state, bool verbose = true) {
+inline void destroy_camera(RendererState* state, bool verbose = true) {
+    if (verbose) {
+        println("Destroying camera");
+    }
     if (state->camera_resources.buffers) {
         for (int i = 0;i < state->swapchain_image_count;i++) {
             if (verbose) {
-                printf("Destroying camera data buffer (%p)\n", state->camera_resources.buffers[i]);
+                println("    Destroying camera data buffer (%p)", state->camera_resources.buffers[i]);
             }
             vkDestroyBuffer(state->device, state->camera_resources.buffers[i], nullptr);
         }
@@ -1197,13 +1384,19 @@ void destroy_camera(RendererState* state, bool verbose = true) {
     if (state->camera_resources.descriptor_sets) {
         free_null(state->camera_resources.descriptor_sets);
     }
+    if (verbose) {
+        println("");
+    }
 }
 
-void destroy_entity_resources(RendererState* state, bool verbose = true) {
+inline void destroy_entity_resources(RendererState* state, bool verbose = true) {
+    if (verbose) {
+        println("Destroying entity resources");
+    }
     if (state->entity_resources.buffers) {
         for (int i = 0;i < state->swapchain_image_count;++i) {
             if (verbose) {
-                printf("Destroying entity buffer (%p)\n", state->entity_resources.buffers[i]);
+                println("    Destroying entity buffer (%p)", state->entity_resources.buffers[i]);
             }
             vkDestroyBuffer(state->device, state->entity_resources.buffers[i], nullptr);
         }
@@ -1222,25 +1415,35 @@ void destroy_entity_resources(RendererState* state, bool verbose = true) {
     if (state->entity_resources.descriptor_sets) {
         free_null(state->entity_resources.descriptor_sets);
     }
+    if (verbose) {
+        println("");
+    }
 }
 
-void destroy_entities(RendererState* state, bool verbose = true) {
+inline void destroy_entities(RendererState* state, bool verbose = true) {
+    if (verbose) {
+        println("Destroying entities");
+    }
     for (int i = 0;i < state->entity_count;++i) {
         if (verbose) {
-            printf("Destroying entity %d\n", i);
+            println("    Destroying entity %d", i);
         }
         vkDestroyBuffer(state->device, state->entities[i].buffer, nullptr);
         free(&state->memory_manager, &state->entities[i].allocation);
     }
+    if (verbose) {
+        println("");
+    }
 }
 
-void cleanup(RendererState* state) {
+inline void cleanup(RendererState* state) {
     if (state->submit_fences) {
         for (int i = 0;i < state->swapchain_image_count;++i) {
             vkWaitForFences(state->device, 1, &state->submit_fences[i], VK_TRUE, 1000000000);
         }
     }
     
+    u64 start = get_time_ns();
     destroy_window(state, true);
     glfwTerminate();
     
@@ -1249,10 +1452,10 @@ void cleanup(RendererState* state) {
     destroy_camera(state, true);
     
     cleanup_gui(&state->gui_state, &state->gui_resources, state, true);
+    destroy_font_atlas_catalog(state, &state->font_atlas_catalog, true);
     cleanup_texture_catalog(state, true);
     destroy_framebuffers(state, true);
     destroy_pipeline(state, true);
-    destroy_gui_pipeline(state, true);
     
     destroy_renderpass(state, true);
     destroy_descriptor_set_layout(state, true);
@@ -1271,8 +1474,11 @@ void cleanup(RendererState* state) {
     destroy_device(state, true);
     destroy_surface(state, true);
     destroy_instance(state, true);
-    destroy_temporary_storage(&state->temporary_storage, true);
-    destroy_temporary_storage(&state->main_arena, true);
+    destroy_memory_arena(&state->temporary_storage, true);
+    destroy_memory_arena(&state->main_arena, true);
+    u64 end = get_time_ns();
+    
+    println("Clean up done in %f s", (f64)(end - start) / (f64)(1e9));
 }
 
 int main() {
@@ -1295,7 +1501,7 @@ int main() {
     while (!glfwWindowShouldClose(state.window) && !state.crashed) {
         do_frame(&state, &window_user_data, &time);
         
-        update_fps_counter(state.window, &fps_counter);
+        update_fps_counter(&state, state.window, &fps_counter);
     }
     
     cleanup(&state);

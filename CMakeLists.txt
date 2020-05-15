@@ -12,6 +12,11 @@ find_package(glfw3 REQUIRED)
 link_directories(/usr/local/lib/)
 
 # Set compile options
-add_compile_options(-std=c++17 -pthread -fno-exceptions -O3)
+add_compile_options(-std=c++17 -pthread -fno-exceptions)
+
+if (CMAKE_BUILD_TYPE MATCHES Release)
+	message("Optimization enabled")
+	add_compile_options(-O3)
+endif(CMAKE_BUILD_TYPE MATCHES Release)
 
 add_subdirectory(src)
