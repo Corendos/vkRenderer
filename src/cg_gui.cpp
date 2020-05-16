@@ -331,8 +331,8 @@ inline bool destroy_gui_resources(GuiResources* resources, RendererState* state,
 inline bool init_gui_state(GuiState* gui_state, GuiResources* resources, RendererState* renderer_state, MemoryArena* storage) {
     gui_state->vertex_buffer = (GuiVertex*)zero_allocate(storage, MAX_GUI_VERTEX_COUNT * sizeof(GuiVertex));
     gui_state->current_size = 0;
-    gui_state->screen_size.x = renderer_state->swapchain_extent.width;
-    gui_state->screen_size.y = renderer_state->swapchain_extent.height;
+    gui_state->screen_size.x = (i32)renderer_state->swapchain_extent.width;
+    gui_state->screen_size.y = (i32)renderer_state->swapchain_extent.height;
     gui_state->window = renderer_state->window;
     
     gui_state->resources = resources;
@@ -362,20 +362,20 @@ inline void cleanup_gui(GuiState* gui_state, GuiResources* resources, RendererSt
     destroy_gui_resources(resources, renderer_state, verbose);
 }
 
-inline Vec2f screen_space_to_normalized_space(Vec2f screen_size, f32 x, f32 y) {
+inline Vec2f screen_space_to_normalized_space(Vec2u screen_size, i32 x, i32 y) {
     Vec2f result = {};
     
-    result.x = (((f32)x + 0.5f) / screen_size.x) * 2.0f - 1.0f;
-    result.y = (((f32)y + 0.5f) / screen_size.y) * 2.0f - 1.0f;
+    result.x = ((f32)x / (f32)screen_size.x) * 2.0f - 1.0f;
+    result.y = ((f32)y / (f32)screen_size.y) * 2.0f - 1.0f;
     
     return result;
 }
 
-inline Vec2f screen_space_to_normalized_space(Vec2f screen_size, Vec2f input) {
+inline Vec2f screen_space_to_normalized_space(Vec2u screen_size, Vec2i input) {
     return screen_space_to_normalized_space(screen_size, input.x, input.y);
 }
 
-inline void draw_rectangle(GuiState* state, f32 left, f32 top, f32 right, f32 bottom, Vec4f color) {
+inline void draw_rectangle(GuiState* state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color) {
     assert(state->current_size + 6 <= MAX_GUI_VERTEX_COUNT);
     
     GuiVertex bottom_left_vertex = {};
@@ -403,10 +403,11 @@ inline void draw_rectangle(GuiState* state, f32 left, f32 top, f32 right, f32 bo
     state->vertex_buffer[state->current_size++] = bottom_right_vertex;
 }
 
-inline bool draw_button(GuiState* state, Input* input, bool button_state, f32 left, f32 top, f32 right, f32 bottom, Vec4f color, Vec4f hover_color, Vec4f active_color) {
+inline bool draw_button(GuiState* state, Input* input, bool button_state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color, Vec4f hover_color, Vec4f active_color) {
     f64 mouse_x, mouse_y;
     
     glfwGetCursorPos(state->window, &mouse_x, &mouse_y);
+    // NOTE: what is the behaviour of this comparison ?
     bool inside = mouse_x >= left &&
         mouse_x <= right &&
         mouse_y >= top &&
@@ -422,18 +423,18 @@ inline bool draw_button(GuiState* state, Input* input, bool button_state, f32 le
     return (inside && input->button_pressed[GLFW_MOUSE_BUTTON_LEFT]);
 }
 
-inline Rect2f get_text_bounding_box(ConstString* text, FontAtlas* font_atlas) {
-    Rect2f bounding_box = {};
-    f32* left   = &bounding_box.left;
-    f32* top    = &bounding_box.top;
-    f32* right  = &bounding_box.right;
-    f32* bottom = &bounding_box.bottom;
+inline Rect2i get_text_bounding_box(ConstString* text, FontAtlas* font_atlas) {
+    Rect2i bounding_box = {};
+    i32* left   = &bounding_box.left;
+    i32* top    = &bounding_box.top;
+    i32* right  = &bounding_box.right;
+    i32* bottom = &bounding_box.bottom;
     
-    f32 x_pos = 0.0f;
+    i32 x_pos = 0;
     for (u32 i = 0;i < text->size;++i) {
         char* c = text->str + i;
         u32 index = get_ascii_character_index(font_atlas, *c);
-        Glyph* g = font_atlas->glyphs + index;
+        Glyph2* g = font_atlas->glyphs + index;
         
         *left   = min(*left, x_pos + g->x_offset);
         *right  = max(*right, x_pos + max(g->x_offset_2, g->x_advance));
@@ -446,16 +447,16 @@ inline Rect2f get_text_bounding_box(ConstString* text, FontAtlas* font_atlas) {
     return bounding_box;
 }
 
-inline Vec2f get_text_dimensions(ConstString* text, FontAtlas* font_atlas) {
-    Rect2f bounding_box = get_text_bounding_box(text, font_atlas);
-    return new_vec2f(bounding_box.right - bounding_box.left, bounding_box.bottom - bounding_box.top);
+inline Vec2u get_text_dimensions(ConstString* text, FontAtlas* font_atlas) {
+    Rect2i bounding_box = get_text_bounding_box(text, font_atlas);
+    return new_vec2u(bounding_box.right - bounding_box.left, bounding_box.bottom - bounding_box.top);
 }
 
-inline GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas, f32 x, f32 y, f32 u, f32 v, u32 font_index, Vec4f color) {
+inline GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas, i32 x, i32 y, u32 u, u32 v, u32 font_index, Vec4f color) {
     GuiVertex vertex = {};
     
-    vertex.position   = {x + 0.5f, y + 0.5f};
-    vertex.uv         = new_vec2f(u / (f32)font_atlas->width, v / (f32)font_atlas->height);
+    vertex.position_int   = {x, y};
+    vertex.uv         = new_vec2f((f32)u / (f32)font_atlas->width, (f32)v / (f32)font_atlas->height);
     vertex.text_blend = 1.0f;
     vertex.color      = color;
     vertex.font_index = font_index;
@@ -463,15 +464,15 @@ inline GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas, f32 x,
     return vertex;
 }
 
-inline GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas, Vec2f position, Vec2f uv, u32 font_index, Vec4f color) {
+inline GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas, Vec2i position, Vec2u uv, u32 font_index, Vec4f color) {
     return make_text_vertex(state, font_atlas, position.x, position.y, uv.x, uv.y, font_index, color);
 }
 
-inline Vec2f compute_offset_from_bounding_box(Rect2f bounding_box, f32 x, f32 y, TextAnchor text_anchor) {
-    Vec2f offset = {x, y};
+inline Vec2i compute_offset_from_bounding_box(Rect2i bounding_box, i32 x, i32 y, TextAnchor text_anchor) {
+    Vec2i offset = {x, y};
     
-    f32 height = 0.0f;
-    f32 width = 0.0f;
+    i32 height = 0;
+    i32 width  = 0;
     switch (text_anchor) {
         case TopLeft:
         offset.x += -bounding_box.left;
@@ -496,63 +497,63 @@ inline Vec2f compute_offset_from_bounding_box(Rect2f bounding_box, f32 x, f32 y,
         case MiddleLeft:
         height = bounding_box.bottom - bounding_box.top;
         offset.x += -bounding_box.left;
-        offset.y += -bounding_box.top - height / 2.0f;
+        offset.y += -bounding_box.top - height / 2;
         break;
         
         case MiddleRight:
         height = bounding_box.bottom - bounding_box.top;
         offset.x += -bounding_box.right;
-        offset.y += -bounding_box.top - height / 2.0f;
+        offset.y += -bounding_box.top - height / 2;
         break;
         
         case TopMiddle:
         width = bounding_box.right - bounding_box.left;
-        offset.x += -bounding_box.left - width / 2.0f;
+        offset.x += -bounding_box.left - width / 2;
         offset.y += -bounding_box.top;
         break;
         
         case BottomMiddle:
         width = bounding_box.right - bounding_box.left;
-        offset.x += -bounding_box.left - width / 2.0f;
+        offset.x += -bounding_box.left - width / 2;
         offset.y += -bounding_box.bottom;
         break;
         
         case Center:
         width =  bounding_box.right - bounding_box.left;
         height = bounding_box.bottom - bounding_box.top;
-        offset.x += -bounding_box.left - width / 2.0f;
-        offset.y += -bounding_box.top - height / 2.0f;
+        offset.x += -bounding_box.left - width / 2;
+        offset.y += -bounding_box.top - height / 2;
         break;
     }
     return offset;
 }
 
 inline void draw_text(GuiState* state, ConstString* text,
-                      f32 x, f32 y, Vec4f color,
+                      i32 x, i32 y, Vec4f color,
                       TextAnchor text_anchor,
                       FontAtlas* font_atlas) {
     assert((state->current_size + 6 * text->size) < MAX_GUI_VERTEX_COUNT);
     
     u32 start_index = state->current_size;
     
-    f32 pos_x = 0.0f;
-    f32 pos_y = 0.0f;
+    i32 pos_x = 0;
+    i32 pos_y = 0;
     
-    Rect2f bounding_box = {};
-    f32* left   = &bounding_box.left;
-    f32* top    = &bounding_box.top;
-    f32* right  = &bounding_box.right;
-    f32* bottom = &bounding_box.bottom;
+    Rect2i bounding_box = {};
+    i32* left   = &bounding_box.left;
+    i32* top    = &bounding_box.top;
+    i32* right  = &bounding_box.right;
+    i32* bottom = &bounding_box.bottom;
     for (u32 i = 0;i < text->size;++i) {
         char* c = text->str + i;
         u32 index = get_ascii_character_index(font_atlas, *c);
-        Glyph* g = font_atlas->glyphs + index;
+        Glyph2* g = font_atlas->glyphs + index;
         
         // Compute quad
-        f32 text_left   = pos_x + g->x_offset;
-        f32 text_right  = pos_x + g->x_offset_2;
-        f32 text_top    = pos_y + g->y_offset;
-        f32 text_bottom = pos_y + g->y_offset_2;
+        i32 text_left   = pos_x + g->x_offset;
+        i32 text_right  = pos_x + g->x_offset_2;
+        i32 text_top    = pos_y + g->y_offset;
+        i32 text_bottom = pos_y + g->y_offset_2;
         
         GuiVertex bottom_left_vertex = make_text_vertex(state, font_atlas,
                                                         text_left, text_bottom,
@@ -597,14 +598,14 @@ inline void draw_text(GuiState* state, ConstString* text,
         pos_x += g->x_advance;
     }
     
-    Vec2f offset = compute_offset_from_bounding_box(bounding_box, x, y, text_anchor);
+    Vec2i offset = compute_offset_from_bounding_box(bounding_box, x, y, text_anchor);
     
     for (u32 i = start_index;i < state->current_size;++i) {
         GuiVertex* vertex = state->vertex_buffer + i;
-        vertex->position.x += offset.x;
-        vertex->position.y += offset.y;
+        vertex->position_int.x += offset.x;
+        vertex->position_int.y += offset.y;
         
-        vertex->position = screen_space_to_normalized_space(state->screen_size, vertex->position);
+        vertex->position = screen_space_to_normalized_space(state->screen_size, vertex->position_int);
     }
 }
 

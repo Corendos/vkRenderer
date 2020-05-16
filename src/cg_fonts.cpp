@@ -493,6 +493,22 @@ inline void destroy_font_atlas_catalog(RendererState* state, FontAtlasCatalog* c
     }
 }
 
+inline Glyph2 make_glyph_from_packed_char(stbtt_packedchar* packed_char) {
+    Glyph2 glyph = {};
+    
+    glyph.left       = packed_char->x0;
+    glyph.top        = packed_char->y0;
+    glyph.right      = packed_char->x1;
+    glyph.bottom     = packed_char->y1;
+    glyph.x_offset   = packed_char->xoff;
+    glyph.y_offset   = packed_char->yoff;
+    glyph.x_advance  = packed_char->xadvance;
+    glyph.x_offset_2 = packed_char->xoff2;
+    glyph.y_offset_2 = packed_char->yoff2;
+    
+    return glyph;
+}
+
 inline bool create_font_atlas(Font* font,
                               FontAtlas* font_atlas,
                               u32 font_size,
@@ -506,14 +522,16 @@ inline bool create_font_atlas(Font* font,
     font_atlas->first_unicode_character = first_unicode_character;
     
     font_atlas->glyph_count = character_count;
-    font_atlas->glyphs = (Glyph*)zero_allocate(storage, character_count * sizeof(Glyph));
+    font_atlas->glyphs = (Glyph2*)zero_allocate(storage, character_count * sizeof(Glyph2));
+    font_atlas->pixels = (u8*)zero_allocate(storage, font_atlas->width * font_atlas->height * sizeof(u8));
     
-    stbtt_packedchar* packed_characters = (stbtt_packedchar*)font_atlas->glyphs;
+    TemporaryMemory temporary_memory = make_temporary_memory(storage);
+    
+    stbtt_packedchar* packed_characters = (stbtt_packedchar*)zero_allocate(&temporary_memory, character_count * sizeof(stbtt_packedchar));
     
     if (packed_characters == 0) return false;
     
     stbtt_pack_context context = {};
-    font_atlas->pixels = (u8*)zero_allocate(storage, font_atlas->width * font_atlas->height * sizeof(u8));
     int result = stbtt_PackBegin(&context,
                                  font_atlas->pixels,
                                  font_atlas->width,
@@ -531,6 +549,14 @@ inline bool create_font_atlas(Font* font,
                                  packed_characters);
     
     stbtt_PackEnd(&context);
+    
+    for (u32 i = 0;i < character_count;++i) {
+        Glyph2* glyph = font_atlas->glyphs + i;
+        stbtt_packedchar* packed_char = packed_characters + i;
+        *glyph = make_glyph_from_packed_char(packed_char);
+    }
+    
+    destroy_temporary_memory(&temporary_memory);
     
     return (result != 0);
 }
@@ -754,6 +780,7 @@ inline u32 get_ascii_character_index(FontAtlas* font_atlas, char character) {
     return (u32)character - font_atlas->first_unicode_character;
 }
 
+/*
 inline char* to_string(FontAtlas* font_atlas, MemoryArena* temporary_storage, u32 indentation_level = 0, u32* bytes_written = 0) {
     char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
     for (u32 i = 0;i < indentation_level;i++) {
@@ -846,3 +873,4 @@ inline void print_font_atlas_catalog(FontAtlasCatalog* font_atlas_catalog) {
                 font_atlas->size);
     }
 }
+*/

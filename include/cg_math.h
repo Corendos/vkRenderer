@@ -60,6 +60,85 @@ struct Rect2f {
     };
 };
 
+struct Vec2u {
+    union {
+        struct { u32 x; u32 y; };
+        struct { u32 r; u32 g; };
+        u32 v[2];
+    };
+};
+
+struct Vec3u {
+    union {
+        struct { u32 x; u32 y; u32 z; };
+        struct { u32 r; u32 g; u32 b; };
+        u32 v[3];
+    };
+};
+
+struct Vec4u {
+    union {
+        struct { u32 x; u32 y; u32 z; u32 w; };
+        struct { u32 r; u32 g; u32 b; u32 a; };
+        u32 v[4];
+    };
+};
+
+struct Rect2u {
+    union {
+        struct {
+            u32 left;
+            u32 top;
+            u32 right;
+            u32 bottom;
+        };
+        struct {
+            Vec2u p1;
+            Vec2u p2;
+        };
+    };
+};
+
+struct Vec2i {
+    union {
+        struct { i32 x; i32 y; };
+        struct { i32 r; i32 g; };
+        i32 v[2];
+    };
+};
+
+struct Vec3i {
+    union {
+        struct { i32 x; i32 y; i32 z; };
+        struct { i32 r; i32 g; i32 b; };
+        i32 v[3];
+    };
+};
+
+struct Vec4i {
+    union {
+        struct { i32 x; i32 y; i32 z; i32 w; };
+        struct { i32 r; i32 g; i32 b; i32 a; };
+        i32 v[4];
+    };
+};
+
+
+struct Rect2i {
+    union {
+        struct {
+            i32 left;
+            i32 top;
+            i32 right;
+            i32 bottom;
+        };
+        struct {
+            Vec2i p1;
+            Vec2i p2;
+        };
+    };
+};
+
 Vec2f new_vec2f(f32 x = 0.0f, f32 y = 0.0f);
 Vec3f new_vec3f(f32 x = 0.0f, f32 y = 0.0f, f32 z = 0.0f);
 Vec4f new_vec4f(f32 x = 0.0f, f32 y = 0.0f, f32 z = 0.0f, f32 w = 0.0f);
@@ -71,6 +150,20 @@ Mat4f new_mat4f(f32 m00, f32 m01, f32 m02, f32 m03,
 
 Rect2f new_rect2f(f32 left, f32 top, f32 right, f32 bottom);
 Rect2f new_rect2f(Vec2f p1, Vec2f p2);
+
+Vec2u new_vec2u(u32 x = 0, u32 y = 0);
+Vec3u new_vec3u(u32 x = 0, u32 y = 0, u32 z = 0);
+Vec4u new_vec4u(u32 x = 0, u32 y = 0, u32 z = 0, u32 w = 0);
+
+Rect2u new_rect2u(u32 left, u32 top, u32 right, u32 bottom);
+Rect2u new_rect2u(Vec2u p1, Vec2u p2);
+
+Vec2i new_vec2i(i32 x = 0, i32 y = 0);
+Vec3i new_vec3i(i32 x = 0, i32 y = 0, i32 z = 0);
+Vec4i new_vec4i(i32 x = 0, i32 y = 0, i32 z = 0, i32 w = 0);
+
+Rect2i new_rect2i(i32 left, i32 top, i32 right, i32 bottom);
+Rect2i new_rect2i(Vec2i p1, Vec2i p2);
 
 Vec2f get_rect_dimensions(Rect2f* rectangle);
 
@@ -120,6 +213,14 @@ f32 randf();
 char* to_string(Vec2f v, MemoryArena* temporary_storage, u32 indentation_level = 0);
 char* to_string(Vec3f v, MemoryArena* temporary_storage, u32 indentation_level = 0);
 char* to_string(Vec4f v, MemoryArena* temporary_storage, u32 indentation_level = 0);
+
+char* to_string(Vec2u v, MemoryArena* temporary_storage, u32 indentation_level = 0);
+char* to_string(Vec3u v, MemoryArena* temporary_storage, u32 indentation_level = 0);
+char* to_string(Vec4u v, MemoryArena* temporary_storage, u32 indentation_level = 0);
+
+char* to_string(Vec2i v, MemoryArena* temporary_storage, u32 indentation_level = 0);
+char* to_string(Vec3i v, MemoryArena* temporary_storage, u32 indentation_level = 0);
+char* to_string(Vec4i v, MemoryArena* temporary_storage, u32 indentation_level = 0);
 
 f32 min(f32 a, f32 b);
 f32 max(f32 a, f32 b);

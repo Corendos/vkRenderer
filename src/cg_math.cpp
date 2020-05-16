@@ -79,6 +79,95 @@ inline Rect2f new_rect2f(Vec2f p1, Vec2f p2) {
     return rectangle;
 }
 
+inline Vec2u new_vec2u(u32 x, u32 y) {
+    Vec2u v = {};
+    v.x = x;
+    v.y = y;
+    return v;
+}
+
+inline Vec3u new_vec3u(u32 x, u32 y, u32 z) {
+    Vec3u v = {};
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    return v;
+}
+
+inline Vec4u new_vec4u(u32 x, u32 y, u32 z, u32 w) {
+    Vec4u v = {};
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    v.w = w;
+    return v;
+}
+
+inline Rect2u new_rect2u(u32 left, u32 top, u32 right, u32 bottom) {
+    Rect2u rectangle = {};
+    
+    rectangle.left   = left;
+    rectangle.top    = top;
+    rectangle.right  = right;
+    rectangle.bottom = bottom;
+    
+    return rectangle;
+}
+
+inline Rect2u new_rect2u(Vec2u p1, Vec2u p2) {
+    Rect2u rectangle = {};
+    
+    rectangle.p1 = p1;
+    rectangle.p2 = p2;
+    
+    return rectangle;
+}
+
+inline Vec2i new_vec2i(i32 x, i32 y) {
+    Vec2i v = {};
+    v.x = x;
+    v.y = y;
+    return v;
+}
+
+inline Vec3i new_vec3i(i32 x, i32 y, i32 z) {
+    Vec3i v = {};
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    return v;
+}
+
+inline Vec4i new_vec4i(i32 x, i32 y, i32 z, i32 w) {
+    Vec4i v = {};
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    v.w = w;
+    return v;
+}
+
+inline Rect2i new_rect2i(i32 left, i32 top, i32 right, i32 bottom) {
+    Rect2i rectangle = {};
+    
+    rectangle.left   = left;
+    rectangle.top    = top;
+    rectangle.right  = right;
+    rectangle.bottom = bottom;
+    
+    return rectangle;
+}
+
+inline Rect2i new_rect2i(Vec2i p1, Vec2i p2) {
+    Rect2i rectangle = {};
+    
+    rectangle.p1 = p1;
+    rectangle.p2 = p2;
+    
+    return rectangle;
+}
+
+
 inline Vec2f get_rect_dimensions(Rect2f* rectangle) {
     return new_vec2f(rectangle->right - rectangle->left, rectangle->bottom - rectangle->top);
 }
@@ -409,6 +498,138 @@ inline char* to_string(Vec4f v, MemoryArena* temporary_storage, u32 indentation_
             "%s    y: %06.6f\n"
             "%s    z: %06.6f\n"
             "%s    w: %06.6f\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space, v.z,
+            indent_space, v.w,
+            indent_space);
+    
+    return str;
+}
+
+inline char* to_string(Vec2u v, MemoryArena* temporary_storage, u32 indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (u32 i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %u\n"
+            "%s    y: %u\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space);
+    
+    return str;
+}
+
+inline char* to_string(Vec3u v, MemoryArena* temporary_storage, u32 indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (u32 i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %u\n"
+            "%s    y: %u\n"
+            "%s    z: %u\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space, v.z,
+            indent_space);
+    
+    return str;
+}
+
+inline char* to_string(Vec4u v, MemoryArena* temporary_storage, u32 indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (u32 i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %u\n"
+            "%s    y: %u\n"
+            "%s    z: %u\n"
+            "%s    w: %u\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space, v.z,
+            indent_space, v.w,
+            indent_space);
+    
+    return str;
+}
+
+inline char* to_string(Vec2i v, MemoryArena* temporary_storage, u32 indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (u32 i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %d\n"
+            "%s    y: %d\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space);
+    
+    return str;
+}
+
+inline char* to_string(Vec3i v, MemoryArena* temporary_storage, u32 indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (u32 i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %d\n"
+            "%s    y: %d\n"
+            "%s    z: %d\n"
+            "%s}",
+            indent_space, v.x,
+            indent_space, v.y,
+            indent_space, v.z,
+            indent_space);
+    
+    return str;
+}
+
+inline char* to_string(Vec4i v, MemoryArena* temporary_storage, u32 indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (u32 i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 100);
+    
+    sprintf(str,
+            "Vec2f {\n"
+            "%s    x: %d\n"
+            "%s    y: %d\n"
+            "%s    z: %d\n"
+            "%s    w: %d\n"
             "%s}",
             indent_space, v.x,
             indent_space, v.y,

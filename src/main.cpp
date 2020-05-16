@@ -203,7 +203,7 @@ inline bool handle_swapchain_recreation(RendererState* state, WindowUserData* wi
         
         state->camera.aspect = (f32)state->swapchain_extent.width / (f32)state->swapchain_extent.height;
         state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
-        state->gui_state.screen_size = new_vec2f(state->swapchain_extent.width, state->swapchain_extent.height);
+        state->gui_state.screen_size = new_vec2u(state->swapchain_extent.width, state->swapchain_extent.height);
         
         state->skip_image = false;
     }
@@ -1044,28 +1044,27 @@ inline void update_entities(RendererState* state) {
 
 inline void update_gui_funk(RendererState* state, Input* input) {
     ConstString font_name = make_literal_string("ubuntu");
-    FontAtlas* font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, 20);
-    assert(font_atlas != 0);
     
     char text[101];
     String string = make_string(text, 100);
     
     // Top Line
     u32 font_size = 30;
-    f32 pos_x = 0;
-    f32 pos_y = 0;
+    FontAtlas* font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, font_size);
+    
+    assert(font_atlas != 0);
+    i32 pos_x = 0;
+    i32 pos_y = 0;
     string_format(string, "TopLeft");
     ConstString const_string = make_const_string(&string);
     draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 30, 30), TextAnchor::TopLeft, font_atlas);
     
-    font_size = 30;
     pos_x = state->swapchain_extent.width / 2;
     pos_y = 0;
     string_format(string, "TopMiddle");
     const_string = make_const_string(&string);
     draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 255, 30), TextAnchor::TopMiddle, font_atlas);
     
-    font_size = 30;
     pos_x = state->swapchain_extent.width;
     pos_y = 0;
     string_format(string, "TopRight");
@@ -1073,21 +1072,21 @@ inline void update_gui_funk(RendererState* state, Input* input) {
     draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 30, 255), TextAnchor::TopRight, font_atlas);
     
     // Centered Line
-    font_size = 20;
+    //font_size = 20;
+    font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, font_size);
+    assert(font_atlas != 0);
     pos_x = 0;
     pos_y = state->swapchain_extent.height / 2;
     string_format(string, "MiddleLeft");
     const_string = make_const_string(&string);
     draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 255, 30), TextAnchor::MiddleLeft, font_atlas);
     
-    font_size = 20;
     pos_x = state->swapchain_extent.width / 2;
     pos_y = state->swapchain_extent.height / 2;
     string_format(string, "Center");
     const_string = make_const_string(&string);
     draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 30, 255), TextAnchor::Center, font_atlas);
     
-    font_size = 20;
     pos_x = state->swapchain_extent.width;
     pos_y = state->swapchain_extent.height / 2;
     string_format(string, "MiddleRight");
@@ -1096,21 +1095,21 @@ inline void update_gui_funk(RendererState* state, Input* input) {
     
     
     // Bottom line
-    font_size = 10;
+    //font_size = 17;
+    font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, font_size);
+    assert(font_atlas != 0);
     pos_x = 0;
     pos_y = state->swapchain_extent.height;
     string_format(string, "BottomLeft");
     const_string = make_const_string(&string);
     draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 255, 255), TextAnchor::BottomLeft, font_atlas);
     
-    font_size = 10;
     pos_x = state->swapchain_extent.width / 2;
     pos_y = state->swapchain_extent.height;
     string_format(string, "BottomMiddle");
     const_string = make_const_string(&string);
     draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 30, 30), TextAnchor::BottomMiddle, font_atlas);
     
-    font_size = 10;
     pos_x = state->swapchain_extent.width;
     pos_y = state->swapchain_extent.height;
     string_format(string, "BottomRight");

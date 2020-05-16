@@ -15,7 +15,10 @@
 struct RendererState;
 
 struct GuiVertex {
-    Vec2f position;
+    union {
+        Vec2f position;
+        Vec2i position_int;
+    };
     Vec2f uv;
     Vec4f color;
     float text_blend;
@@ -51,7 +54,7 @@ struct GuiState {
     GuiVertex* vertex_buffer;
     u32 current_size;
     
-    Vec2f screen_size;
+    Vec2u screen_size;
     
     GLFWwindow* window;
     GuiResources* resources;
@@ -87,21 +90,21 @@ bool init_gui(GuiState* gui_state, GuiResources* resources, RendererState* state
 void reset_gui(GuiState* state, GuiResources* resources);
 void cleanup_gui(GuiState* state, GuiResources* resources, RendererState* renderer_state, bool verbose = false);
 
-void draw_rectangle(GuiState* state, f32 left, f32 top, f32 right, f32 bottom, Vec4f color);
-bool draw_button(GuiState* state, Input* input, bool button_state, f32 left, f32 top, f32 right, f32 bottom, Vec4f color, Vec4f hover_color, Vec4f active_color);
+void draw_rectangle(GuiState* state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color);
+bool draw_button(GuiState* state, Input* input, bool button_state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color, Vec4f hover_color, Vec4f active_color);
 
-Vec2f get_text_dimensions(ConstString* text, FontAtlas* font_atlas);
-Rect2f get_text_bounding_box(ConstString* text, FontAtlas* font_atlas);
+Vec2u get_text_dimensions(ConstString* text, FontAtlas* font_atlas);
+Rect2i get_text_bounding_box(ConstString* text, FontAtlas* font_atlas);
 GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas,
-                           f32 x, f32 y,
-                           f32 u, f32 v,
+                           i32 x, i32 y,
+                           u32 u, u32 v,
                            u32 font_index,
                            Vec4f color);
 GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas,
-                           Vec2f position, Vec2f uv,
+                           Vec2i position, Vec2u uv,
                            u32 font_index, Vec4f color);
-Vec2f compute_offset_from_bounding_box(Rect2f bounding_box, f32 x, f32 y, TextAnchor text_anchor);
-void draw_text(GuiState* state, ConstString* text, f32 x, f32 y, Vec4f color, TextAnchor text_anchor, FontAtlas* font_atlas);
+Vec2i compute_offset_from_bounding_box(Rect2i bounding_box, i32 x, i32 y, TextAnchor text_anchor);
+void draw_text(GuiState* state, ConstString* text, i32 x, i32 y, Vec4f color, TextAnchor text_anchor, FontAtlas* font_atlas);
 
 char* to_string(GuiState* state, MemoryArena* temporary_storage, u32 indentation_level = 0);
 
