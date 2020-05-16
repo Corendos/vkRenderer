@@ -434,7 +434,7 @@ inline Rect2i get_text_bounding_box(ConstString* text, FontAtlas* font_atlas) {
     for (u32 i = 0;i < text->size;++i) {
         char* c = text->str + i;
         u32 index = get_ascii_character_index(font_atlas, *c);
-        Glyph2* g = font_atlas->glyphs + index;
+        Glyph* g = font_atlas->glyphs + index;
         
         *left   = min(*left, x_pos + g->x_offset);
         *right  = max(*right, x_pos + max(g->x_offset_2, g->x_advance));
@@ -547,7 +547,7 @@ inline void draw_text(GuiState* state, ConstString* text,
     for (u32 i = 0;i < text->size;++i) {
         char* c = text->str + i;
         u32 index = get_ascii_character_index(font_atlas, *c);
-        Glyph2* g = font_atlas->glyphs + index;
+        Glyph* g = font_atlas->glyphs + index;
         
         // Compute quad
         i32 text_left   = pos_x + g->x_offset;

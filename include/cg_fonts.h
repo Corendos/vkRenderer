@@ -27,7 +27,7 @@ struct FontCatalog {
     u32 size;
 };
 
-struct Glyph2 {
+struct Glyph {
     u16 left;
     u16 top;
     u16 right;
@@ -37,23 +37,6 @@ struct Glyph2 {
     i32 x_advance;
     i32 x_offset_2;
     i32 y_offset_2;
-};
-
-struct Glyph {
-    union {
-        stbtt_packedchar packedchar;
-        struct {
-            u16 left;
-            u16 top;
-            u16 right;
-            u16 bottom;
-            f32 x_offset;
-            f32 y_offset;
-            f32 x_advance;
-            f32 x_offset_2;
-            f32 y_offset_2;
-        };
-    };
 };
 
 struct FontAtlas {
@@ -67,7 +50,7 @@ struct FontAtlas {
     
     u32 first_unicode_character;
     
-    Glyph2* glyphs;
+    Glyph* glyphs;
     u32 glyph_count;
     
     u32 texture_array_index;

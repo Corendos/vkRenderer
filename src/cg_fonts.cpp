@@ -493,8 +493,8 @@ inline void destroy_font_atlas_catalog(RendererState* state, FontAtlasCatalog* c
     }
 }
 
-inline Glyph2 make_glyph_from_packed_char(stbtt_packedchar* packed_char) {
-    Glyph2 glyph = {};
+inline Glyph make_glyph_from_packed_char(stbtt_packedchar* packed_char) {
+    Glyph glyph = {};
     
     glyph.left       = packed_char->x0;
     glyph.top        = packed_char->y0;
@@ -522,7 +522,7 @@ inline bool create_font_atlas(Font* font,
     font_atlas->first_unicode_character = first_unicode_character;
     
     font_atlas->glyph_count = character_count;
-    font_atlas->glyphs = (Glyph2*)zero_allocate(storage, character_count * sizeof(Glyph2));
+    font_atlas->glyphs = (Glyph*)zero_allocate(storage, character_count * sizeof(Glyph));
     font_atlas->pixels = (u8*)zero_allocate(storage, font_atlas->width * font_atlas->height * sizeof(u8));
     
     TemporaryMemory temporary_memory = make_temporary_memory(storage);
@@ -551,7 +551,7 @@ inline bool create_font_atlas(Font* font,
     stbtt_PackEnd(&context);
     
     for (u32 i = 0;i < character_count;++i) {
-        Glyph2* glyph = font_atlas->glyphs + i;
+        Glyph* glyph = font_atlas->glyphs + i;
         stbtt_packedchar* packed_char = packed_characters + i;
         *glyph = make_glyph_from_packed_char(packed_char);
     }
