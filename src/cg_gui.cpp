@@ -375,54 +375,6 @@ inline Vec2f screen_space_to_normalized_space(Vec2u screen_size, Vec2i input) {
     return screen_space_to_normalized_space(screen_size, input.x, input.y);
 }
 
-inline void draw_rectangle(GuiState* state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color) {
-    assert(state->current_size + 6 <= MAX_GUI_VERTEX_COUNT);
-    
-    GuiVertex bottom_left_vertex = {};
-    bottom_left_vertex.position  = screen_space_to_normalized_space(state->screen_size, left, bottom);
-    bottom_left_vertex.color     = color;
-    
-    GuiVertex top_left_vertex = {};
-    top_left_vertex.position  = screen_space_to_normalized_space(state->screen_size, left, top);
-    top_left_vertex.color     = color;
-    
-    GuiVertex bottom_right_vertex = {};
-    bottom_right_vertex.position  = screen_space_to_normalized_space(state->screen_size, right, bottom);
-    bottom_right_vertex.color     = color;
-    
-    GuiVertex top_right_vertex = {};
-    top_right_vertex.position  = screen_space_to_normalized_space(state->screen_size, right, top);
-    top_right_vertex.color     = color;
-    
-    state->vertex_buffer[state->current_size++] = bottom_left_vertex;
-    state->vertex_buffer[state->current_size++] = top_left_vertex;
-    state->vertex_buffer[state->current_size++] = top_right_vertex;
-    
-    state->vertex_buffer[state->current_size++] = bottom_left_vertex;
-    state->vertex_buffer[state->current_size++] = top_right_vertex;
-    state->vertex_buffer[state->current_size++] = bottom_right_vertex;
-}
-
-inline bool draw_button(GuiState* state, Input* input, bool button_state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color, Vec4f hover_color, Vec4f active_color) {
-    f64 mouse_x, mouse_y;
-    
-    glfwGetCursorPos(state->window, &mouse_x, &mouse_y);
-    // NOTE: what is the behaviour of this comparison ?
-    bool inside = mouse_x >= left &&
-        mouse_x <= right &&
-        mouse_y >= top &&
-        mouse_y <= bottom;
-    
-    if (button_state || (inside && input->button_pressed[GLFW_MOUSE_BUTTON_LEFT])) {
-        draw_rectangle(state, left, top, right, bottom, active_color);
-    } else if (inside) {
-        draw_rectangle(state, left, top, right, bottom, hover_color);
-    } else {
-        draw_rectangle(state, left, top, right, bottom, color);
-    }
-    return (inside && input->button_pressed[GLFW_MOUSE_BUTTON_LEFT]);
-}
-
 inline Rect2i get_text_bounding_box(ConstString* text, FontAtlas* font_atlas) {
     Rect2i bounding_box = {};
     i32* left   = &bounding_box.left;
@@ -468,7 +420,7 @@ inline GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas, Vec2i 
     return make_text_vertex(state, font_atlas, position.x, position.y, uv.x, uv.y, font_index, color);
 }
 
-inline Vec2i compute_offset_from_bounding_box(Rect2i bounding_box, i32 x, i32 y, TextAnchor text_anchor) {
+inline Vec2i compute_text_offset(Rect2i bounding_box, i32 x, i32 y, TextAnchor text_anchor) {
     Vec2i offset = {x, y};
     
     i32 height = 0;
@@ -526,6 +478,128 @@ inline Vec2i compute_offset_from_bounding_box(Rect2i bounding_box, i32 x, i32 y,
         break;
     }
     return offset;
+}
+
+inline char* to_string(GuiState* state, MemoryArena* temporary_storage, u32 indentation_level) {
+    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
+    for (u32 i = 0;i < indentation_level;i++) {
+        indent_space[i] = ' ';
+    }
+    indent_space[indentation_level] = 0;
+    char* str = (char*)allocate(temporary_storage, 10000);
+    
+    sprintf(str,
+            "GuiState {\n"
+            "%s    vertex_buffer: %p\n"
+            "%s    current_size: %d\n"
+            "%s    screen_size: %s\n"
+            "%s}",
+            indent_space, state->vertex_buffer,
+            indent_space, state->current_size,
+            indent_space, to_string(state->screen_size, temporary_storage, indentation_level + 4),
+            indent_space);
+    
+    return str;
+}
+
+inline void draw_rectangle(GuiState* state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color) {
+    assert(state->current_size + 6 <= MAX_GUI_VERTEX_COUNT);
+    
+    GuiVertex bottom_left_vertex = {};
+    bottom_left_vertex.position  = screen_space_to_normalized_space(state->screen_size, left, bottom);
+    bottom_left_vertex.color     = color;
+    
+    GuiVertex top_left_vertex = {};
+    top_left_vertex.position  = screen_space_to_normalized_space(state->screen_size, left, top);
+    top_left_vertex.color     = color;
+    
+    GuiVertex bottom_right_vertex = {};
+    bottom_right_vertex.position  = screen_space_to_normalized_space(state->screen_size, right, bottom);
+    bottom_right_vertex.color     = color;
+    
+    GuiVertex top_right_vertex = {};
+    top_right_vertex.position  = screen_space_to_normalized_space(state->screen_size, right, top);
+    top_right_vertex.color     = color;
+    
+    state->vertex_buffer[state->current_size++] = bottom_left_vertex;
+    state->vertex_buffer[state->current_size++] = top_left_vertex;
+    state->vertex_buffer[state->current_size++] = top_right_vertex;
+    
+    state->vertex_buffer[state->current_size++] = bottom_left_vertex;
+    state->vertex_buffer[state->current_size++] = top_right_vertex;
+    state->vertex_buffer[state->current_size++] = bottom_right_vertex;
+}
+
+inline void draw_rectangle(GuiState* state, Rect2i bound, Vec4f color) {
+    draw_rectangle(state, bound.left, bound.top, bound.right, bound.bottom, color);
+}
+
+inline bool draw_button(GuiState* state, Input* input,
+                        i32 left, i32 top, i32 right, i32 bottom,
+                        bool button_state,
+                        Vec4f color,
+                        Vec4f hover_color,
+                        Vec4f active_color) {
+    f64 mouse_x, mouse_y;
+    
+    glfwGetCursorPos(state->window, &mouse_x, &mouse_y);
+    // NOTE: what is the behaviour of this comparison ?
+    bool inside = mouse_x >= left &&
+        mouse_x <= right &&
+        mouse_y >= top &&
+        mouse_y <= bottom;
+    
+    if (button_state || (inside && input->button_pressed[GLFW_MOUSE_BUTTON_LEFT])) {
+        draw_rectangle(state, left, top, right, bottom, active_color);
+    } else if (inside) {
+        draw_rectangle(state, left, top, right, bottom, hover_color);
+    } else {
+        draw_rectangle(state, left, top, right, bottom, color);
+    }
+    return (inside && input->button_pressed[GLFW_MOUSE_BUTTON_LEFT]);
+}
+
+inline bool draw_button(GuiState* state, Input* input,
+                        Rect2i bound,
+                        bool button_state,
+                        Vec4f color,
+                        Vec4f hover_color,
+                        Vec4f active_color) {
+    return draw_button(state, input,
+                       bound.left, bound.top, bound.right, bound.bottom,
+                       button_state,
+                       color, hover_color, active_color);
+}
+
+inline bool draw_button(GuiState* state, Input* input,
+                        Rect2i bound,
+                        bool button_state,
+                        Vec4f color,
+                        Vec4f hover_color) {
+    return draw_button(state, input,
+                       bound.left, bound.top, bound.right, bound.bottom,
+                       button_state,
+                       color, hover_color, color);
+}
+
+inline bool draw_text_button(GuiState* state, Input* input,
+                             Rect2i bound,
+                             ConstString* text,
+                             FontAtlas* font_atlas,
+                             bool button_state,
+                             Vec4f color,
+                             Vec4f hover_color,
+                             Vec4f active_color,
+                             Vec4f text_color) {
+    bool status = draw_button(state, input, bound, button_state, color, hover_color, active_color);
+    
+    i32 center_x = (bound.left + bound.right) / 2;
+    i32 center_y = (bound.top + bound.bottom) / 2;
+    TextAnchor text_anchor = TextAnchor::Center;
+    
+    draw_text(state, text, center_x, center_y, text_color, text_anchor, font_atlas);
+    
+    return status;
 }
 
 inline void draw_text(GuiState* state, ConstString* text,
@@ -598,7 +672,7 @@ inline void draw_text(GuiState* state, ConstString* text,
         pos_x += g->x_advance;
     }
     
-    Vec2i offset = compute_offset_from_bounding_box(bounding_box, x, y, text_anchor);
+    Vec2i offset = compute_text_offset(bounding_box, x, y, text_anchor);
     
     for (u32 i = start_index;i < state->current_size;++i) {
         GuiVertex* vertex = state->vertex_buffer + i;
@@ -607,26 +681,4 @@ inline void draw_text(GuiState* state, ConstString* text,
         
         vertex->position = screen_space_to_normalized_space(state->screen_size, vertex->position_int);
     }
-}
-
-inline char* to_string(GuiState* state, MemoryArena* temporary_storage, u32 indentation_level) {
-    char* indent_space = (char*)allocate(temporary_storage, indentation_level + 1);
-    for (u32 i = 0;i < indentation_level;i++) {
-        indent_space[i] = ' ';
-    }
-    indent_space[indentation_level] = 0;
-    char* str = (char*)allocate(temporary_storage, 10000);
-    
-    sprintf(str,
-            "GuiState {\n"
-            "%s    vertex_buffer: %p\n"
-            "%s    current_size: %d\n"
-            "%s    screen_size: %s\n"
-            "%s}",
-            indent_space, state->vertex_buffer,
-            indent_space, state->current_size,
-            indent_space, to_string(state->screen_size, temporary_storage, indentation_level + 4),
-            indent_space);
-    
-    return str;
 }

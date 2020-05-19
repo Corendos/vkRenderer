@@ -140,7 +140,7 @@ inline bool check_queue_availability(PhysicalDeviceSelection* selection, VkSurfa
         if (!present_found) {
             VkBool32 present_supported = false;
             if (vkGetPhysicalDeviceSurfaceSupportKHR(selection->device, i, surface, &present_supported) != VK_SUCCESS) {
-                println("Error: failed to query present support for queue family #%d\n", i);
+                println("Error: failed to query present support for queue family #%d", i);
                 free_null(queue_family_property);
                 return false;
             }
@@ -257,7 +257,7 @@ inline u32 get_present_mode_score(VkPresentModeKHR present_mode) {
     u32 score = 0;
     switch (present_mode) {
         case VK_PRESENT_MODE_IMMEDIATE_KHR:
-        score = 10;
+        score = 40;
         break;
         case VK_PRESENT_MODE_MAILBOX_KHR:
         score = 20;
@@ -461,7 +461,7 @@ inline bool create_device_and_queues(RendererState* state) {
     graphics_queue_index = queue_count_per_family[state->selection.graphics_queue_family_index]++;
     transfer_queue_index = queue_count_per_family[state->selection.transfer_queue_family_index]++;
     compute_queue_index  = queue_count_per_family[state->selection.compute_queue_family_index ]++;
-    present_queue_index  = queue_count_per_family[state->selection.compute_queue_family_index ]++;
+    present_queue_index  = queue_count_per_family[state->selection.present_queue_family_index ]++;
     
     u32 queue_create_info_count = 0;
     
@@ -791,7 +791,7 @@ inline bool create_descriptor_set_layout(RendererState* state) {
     binding.binding = 0;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     
     VkDescriptorSetLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -927,7 +927,7 @@ inline bool create_graphics_pipeline(RendererState* state) {
     binding_description.stride = sizeof(Vertex);
     binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     
-    VkVertexInputAttributeDescription attribute_description[2] = {};
+    VkVertexInputAttributeDescription attribute_description[4] = {};
     attribute_description[0].location = 0;
     attribute_description[0].binding = 0;
     attribute_description[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -935,14 +935,24 @@ inline bool create_graphics_pipeline(RendererState* state) {
     
     attribute_description[1].location = 1;
     attribute_description[1].binding = 0;
-    attribute_description[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_description[1].offset = offsetof(Vertex, color);
+    attribute_description[1].format = VK_FORMAT_R32G32_SFLOAT;
+    attribute_description[1].offset = offsetof(Vertex, uv);
+    
+    attribute_description[2].location = 2;
+    attribute_description[2].binding = 0;
+    attribute_description[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_description[2].offset = offsetof(Vertex, normal);
+    
+    attribute_description[3].location = 3;
+    attribute_description[3].binding = 0;
+    attribute_description[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_description[3].offset = offsetof(Vertex, color);
     
     VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {};
     vertex_input_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input_state_create_info.vertexBindingDescriptionCount = 1;
     vertex_input_state_create_info.pVertexBindingDescriptions = &binding_description;
-    vertex_input_state_create_info.vertexAttributeDescriptionCount = 2;
+    vertex_input_state_create_info.vertexAttributeDescriptionCount = array_size(attribute_description);
     vertex_input_state_create_info.pVertexAttributeDescriptions = attribute_description;
     
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state_create_info = {};

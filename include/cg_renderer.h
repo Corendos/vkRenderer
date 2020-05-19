@@ -13,6 +13,7 @@
 #include "cg_gui.h"
 #include "cg_memory_arena.h"
 #include "cg_fonts.h"
+#include "cg_vertex.h"
 
 #define MAX_ENTITY_COUNT 1024
 #define MAIN_ARENA_SIZE MB(256)
@@ -36,9 +37,9 @@ struct CommandBufferSubmission {
     VkFence* fence;
 };
 
-struct Vertex {
-    Vec3f position;
-    Vec3f color;
+struct EntityTransformData {
+    Mat4f model_matrix;
+    Mat4f normal_matrix;
 };
 
 struct Entity {
@@ -48,14 +49,14 @@ struct Entity {
     u32 size;
     u32 offset;
     
-    Mat4f *transform;
+    EntityTransformData *transform_data;
 };
 
 struct EntityResources {
     VkBuffer* buffers;
     VkDescriptorSet* descriptor_sets;
     AllocatedMemoryChunk* allocations;
-    Mat4f transforms[MAX_ENTITY_COUNT];
+    EntityTransformData transform_data[MAX_ENTITY_COUNT];
 };
 
 struct RendererState {

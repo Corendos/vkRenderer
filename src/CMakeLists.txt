@@ -26,6 +26,10 @@ target_link_libraries(${CURRENT_PROJECT} PUBLIC ${Vulkan_LIBRARIES})
 target_include_directories(${CURRENT_PROJECT} PUBLIC ${glfw3_INCLUDE_DIR})
 target_link_libraries(${CURRENT_PROJECT} PUBLIC glfw)
 
+# Include Assimp
+target_include_directories(${CURRENT_PROJECT} PUBLIC ${assimp_INCLUDE_DIR})
+target_link_libraries(${CURRENT_PROJECT} PUBLIC assimp)
+
 # Include GLM
 target_include_directories(${CURRENT_PROJECT} PUBLIC /usr/include/glm)
 

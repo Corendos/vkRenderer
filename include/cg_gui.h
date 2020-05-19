@@ -72,6 +72,7 @@ enum TextAnchor {
     Center,
 };
 
+// Setup and destroy
 bool create_gui_descriptor_set_layout(GuiResources* resources, RendererState* state);
 bool create_gui_pipeline_layout(GuiResources* resources, RendererState* state);
 bool create_gui_pipeline(GuiResources* resources, RendererState* state);
@@ -90,11 +91,7 @@ bool init_gui(GuiState* gui_state, GuiResources* resources, RendererState* state
 void reset_gui(GuiState* state, GuiResources* resources);
 void cleanup_gui(GuiState* state, GuiResources* resources, RendererState* renderer_state, bool verbose = false);
 
-void draw_rectangle(GuiState* state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color);
-bool draw_button(GuiState* state, Input* input, bool button_state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color, Vec4f hover_color, Vec4f active_color);
-
-Vec2u get_text_dimensions(ConstString* text, FontAtlas* font_atlas);
-Rect2i get_text_bounding_box(ConstString* text, FontAtlas* font_atlas);
+// Text
 GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas,
                            i32 x, i32 y,
                            u32 u, u32 v,
@@ -103,9 +100,45 @@ GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas,
 GuiVertex make_text_vertex(GuiState* state, FontAtlas* font_atlas,
                            Vec2i position, Vec2u uv,
                            u32 font_index, Vec4f color);
-Vec2i compute_offset_from_bounding_box(Rect2i bounding_box, i32 x, i32 y, TextAnchor text_anchor);
-void draw_text(GuiState* state, ConstString* text, i32 x, i32 y, Vec4f color, TextAnchor text_anchor, FontAtlas* font_atlas);
+Vec2u get_text_dimensions(ConstString* text, FontAtlas* font_atlas);
+Rect2i get_text_bounding_box(ConstString* text, FontAtlas* font_atlas);
+Vec2i compute_text_offset(Rect2i bounding_box, i32 x, i32 y, TextAnchor text_anchor);
 
 char* to_string(GuiState* state, MemoryArena* temporary_storage, u32 indentation_level = 0);
+
+
+// Public
+void draw_rectangle(GuiState* state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color);
+void draw_rectangle(GuiState* state, Rect2i bound, Vec4f color);
+
+bool draw_button(GuiState* state, Input* input,
+                 i32 left, i32 top, i32 right, i32 bottom,
+                 bool button_state,
+                 Vec4f color,
+                 Vec4f hover_color,
+                 Vec4f active_color);
+bool draw_button(GuiState* state, Input* input,
+                 Rect2i bound,
+                 bool button_state,
+                 Vec4f color,
+                 Vec4f hover_color,
+                 Vec4f active_color);
+bool draw_button(GuiState* state, Input* input,
+                 Rect2i bound,
+                 bool button_state,
+                 Vec4f color,
+                 Vec4f hover_color);
+
+bool draw_text_button(GuiState* state, Input* input,
+                      Rect2i bound,
+                      ConstString* text,
+                      FontAtlas* font_atlas,
+                      bool button_state,
+                      Vec4f color,
+                      Vec4f hover_color,
+                      Vec4f active_color,
+                      Vec4f text_color);
+
+void draw_text(GuiState* state, ConstString* text, i32 x, i32 y, Vec4f color, TextAnchor text_anchor, FontAtlas* font_atlas);
 
 #endif

@@ -125,7 +125,7 @@ bool create_and_add_font_atlases(FontCatalog* font_catalog,
                                  MemoryArena* arena);
 
 FontAtlas* get_font_atlas_from_catalog(FontAtlasCatalog* font_atlas_catalog,
-                                       const char* font_name, u32 font_name_length,
+                                       ConstString* font_name,
                                        u32 font_size);
 
 

@@ -1,5 +1,5 @@
 #!/bin/bash
 
 cd ./build
-cmake .. -DCMAKE_BUILD_TYPE=Debug && make shaders && make
+cmake .. -DCMAKE_BUILD_TYPE=Debug -Wno-dev && make shaders && make
 cd ..

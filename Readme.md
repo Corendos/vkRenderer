@@ -10,3 +10,4 @@ This project is voluntarily not written in modern C++. My motivation for this ch
 ![renderer_1](screenshots/renderer_1.png)
 ![renderer_2](screenshots/renderer_2.png)
 ![renderer_3](screenshots/renderer_3.png)
+![renderer_4](screenshots/renderer_4.png)

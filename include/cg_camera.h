@@ -7,6 +7,9 @@
 struct CameraContext {
     Mat4f projection;
     Mat4f view;
+    Vec3f light_position;
+    f32 _dummy0;
+    Vec3f view_position;
 };
 
 struct CameraResources {
@@ -16,7 +19,7 @@ struct CameraResources {
 };
 
 struct Camera {
-    Vec3f position;
+    Vec3f* position;
     f32 aspect;
     f32 fov;
     

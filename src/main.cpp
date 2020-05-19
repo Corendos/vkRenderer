@@ -7,6 +7,12 @@
 #include <time.h>
 #include <unistd.h>
 
+//#define OBJ_CUSTOM
+
+#ifdef NDEBUG
+#warning "No debuf mode"
+#endif
+
 #include "cg_types.h"
 
 #include "cg_benchmark.h"
@@ -19,6 +25,7 @@
 #include "cg_input.h"
 #include "cg_macros.h"
 #include "cg_memory.h"
+#include "cg_obj_loader.h"
 #include "cg_renderer.h"
 #include "cg_shaders.h"
 #include "cg_string.h"
@@ -27,10 +34,10 @@
 #include "cg_temporary_memory.h"
 #include "cg_timer.h"
 #include "cg_utils.h"
+#include "cg_vertex.h"
 #include "cg_vk_helper.h"
 #include "cg_window.h"
 #include "cg_window_user_data.h"
-
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -58,6 +65,7 @@
 #include "cg_input.cpp"
 #include "cg_math.cpp"
 #include "cg_memory.cpp"
+#include "cg_obj_loader.cpp"
 #include "cg_shaders.cpp"
 #include "cg_string.cpp"
 #include "cg_memory_arena.cpp"
@@ -66,6 +74,7 @@
 #include "cg_timer.cpp"
 #include "cg_utils.cpp"
 #include "cg_vk_helper.cpp"
+#include "cg_vertex.cpp"
 #include "cg_window.cpp"
 
 
@@ -251,9 +260,10 @@ inline bool create_entity(RendererState* state, Vertex* vertex_buffer, u32 verte
     
     memcpy(entity->allocation.data, vertex_buffer, buffer_size);
     
-    entity->offset = state->entity_count * sizeof(Mat4f);
-    entity->transform = &state->entity_resources.transforms[state->entity_count];
-    *entity->transform = identity_mat4f();
+    entity->offset = state->entity_count * sizeof(EntityTransformData);
+    entity->transform_data = &state->entity_resources.transform_data[state->entity_count];
+    entity->transform_data->model_matrix = identity_mat4f();
+    entity->transform_data->normal_matrix = identity_mat4f();
     entity->size = vertex_buffer_size;
     entity->id = state->entity_count + 1;
     *entity_id = entity->id;
@@ -301,6 +311,13 @@ inline void create_cube(Vec3f size, Vertex* vertices) {
     vertices[ 4].color = new_vec3f(1.0f, 0.0f, 0.0f);
     vertices[ 5].color = new_vec3f(1.0f, 0.0f, 0.0f);
     
+    vertices[ 0].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 1].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 2].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 3].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 4].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 5].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    
     // Right face
     vertices[ 6].position = new_vec3f( size.x, -size.y,  size.z);
     vertices[ 7].position = new_vec3f( size.x,  size.y,  size.z);
@@ -316,6 +333,13 @@ inline void create_cube(Vec3f size, Vertex* vertices) {
     vertices[ 9].color = new_vec3f(0.0f, 1.0f, 0.0f);
     vertices[10].color = new_vec3f(0.0f, 1.0f, 0.0f);
     vertices[11].color = new_vec3f(0.0f, 1.0f, 0.0f);
+    
+    vertices[ 6].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[ 7].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[ 8].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[ 9].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[10].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[11].normal = new_vec3f(1.0f, 0.0f, 0.0f);
     
     // Back face
     vertices[12].position = new_vec3f( size.x, -size.y, -size.z);
@@ -333,6 +357,13 @@ inline void create_cube(Vec3f size, Vertex* vertices) {
     vertices[16].color = new_vec3f(0.0f, 0.0f, 1.0f);
     vertices[17].color = new_vec3f(0.0f, 0.0f, 1.0f);
     
+    vertices[12].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[13].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[14].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[15].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[16].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[17].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    
     // Left face
     vertices[18].position = new_vec3f(-size.x, -size.y, -size.z);
     vertices[19].position = new_vec3f(-size.x,  size.y, -size.z);
@@ -348,6 +379,13 @@ inline void create_cube(Vec3f size, Vertex* vertices) {
     vertices[21].color = new_vec3f(1.0f, 0.0f, 1.0f);
     vertices[22].color = new_vec3f(1.0f, 0.0f, 1.0f);
     vertices[23].color = new_vec3f(1.0f, 0.0f, 1.0f);
+    
+    vertices[18].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[19].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[20].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[21].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[22].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[23].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
     
     // Top face
     vertices[24].position = new_vec3f( size.x,  size.y,  size.z);
@@ -365,6 +403,13 @@ inline void create_cube(Vec3f size, Vertex* vertices) {
     vertices[28].color = new_vec3f(1.0f, 1.0f, 0.0f);
     vertices[29].color = new_vec3f(1.0f, 1.0f, 0.0f);
     
+    vertices[24].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[25].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[26].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[27].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[28].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[29].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    
     // Bottom face
     vertices[30].position = new_vec3f(-size.x, -size.y,  size.z);
     vertices[31].position = new_vec3f( size.x, -size.y,  size.z);
@@ -380,6 +425,13 @@ inline void create_cube(Vec3f size, Vertex* vertices) {
     vertices[33].color = new_vec3f(0.0f, 1.0f, 1.0f);
     vertices[34].color = new_vec3f(0.0f, 1.0f, 1.0f);
     vertices[35].color = new_vec3f(0.0f, 1.0f, 1.0f);
+    
+    vertices[30].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[31].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[32].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[33].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[34].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[35].normal = new_vec3f(0.0f, -1.0f, 0.0f);
 }
 
 inline Mat4f random_translation_matrix(f32 range) {
@@ -408,7 +460,8 @@ inline bool create_cube_entity(RendererState* state) {
     
     Mat4f t = random_translation_matrix(5.0f);
     Mat4f r = random_rotation_matrix();
-    *entity->transform = t * r;
+    entity->transform_data->model_matrix= t * r;
+    entity->transform_data->normal_matrix = transpose_inverse(&entity->transform_data->model_matrix);
     
     return true;
 }
@@ -514,14 +567,15 @@ inline void update_camera_descriptor_set(RendererState* state) {
 
 inline bool init_camera(RendererState* state) {
     state->camera.fov = 70.0f;
-    state->camera.position = new_vec3f(0.0f, 0.0f, 0.0f);
+    state->camera.position = &state->camera.context.view_position;
+    *state->camera.position = new_vec3f(0.0f, 0.0f, 0.0f);
     state->camera.yaw = -PI_2;
     state->camera.pitch = 0.0f;
     state->camera.speed = 0.0015f;
     state->camera.aspect = (f32)state->swapchain_extent.width / (f32)state->swapchain_extent.height;
     
     state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
-    state->camera.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
+    state->camera.context.view = look_from_yaw_and_pitch(*state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
     
     if (!allocate_camera_descriptor_sets(state)) {
         return false;
@@ -542,7 +596,7 @@ inline bool create_entity_buffers(RendererState* state) {
     
     VkBufferCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size  = MAX_ENTITY_COUNT * sizeof(Mat4f);
+    create_info.size  = MAX_ENTITY_COUNT * sizeof(EntityTransformData);
     create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create_info.queueFamilyIndexCount = 1;
@@ -610,7 +664,7 @@ inline void update_entity_descriptor_sets(RendererState* state) {
     for (int i = 0;i < state->swapchain_image_count;++i) {
         buffer_info[i].buffer = state->entity_resources.buffers[i];
         buffer_info[i].offset = 0;
-        buffer_info[i].range = sizeof(Mat4f);
+        buffer_info[i].range = sizeof(EntityTransformData);
     }
     
     VkWriteDescriptorSet* writes;
@@ -940,6 +994,26 @@ inline bool init(RendererState* state, WindowUserData* window_user_data) {
         }
     }
     
+    u64 start = get_time_ns();
+    String obj_filename_var = push_string(&state->temporary_storage, 100);
+    string_format(obj_filename_var, "%s/resources/models/obj/Trumpet.obj", PROGRAM_ROOT);
+    ConstString obj_filename = make_const_string(&obj_filename_var);
+    
+    Vertex* vertex_buffer = {};
+    u32 vertex_buffer_size = 0;
+    
+    if (!load_obj_file(&obj_filename, &vertex_buffer, &vertex_buffer_size, &state->main_arena)) {
+        return false;
+    }
+    u64 end = get_time_ns();
+    
+    println("Loading took %f s", (f32)(end - start) / (f32)1e9);
+    
+    u32 trumpet_id = 0;
+    if (!create_entity(state, vertex_buffer, vertex_buffer_size, &trumpet_id)) {
+        return false;
+    }
+    
     glfwSetWindowUserPointer(state->window, window_user_data);
     glfwSetKeyCallback(state->window, key_callback);
     glfwSetMouseButtonCallback(state->window, mouse_button_callback);
@@ -1034,119 +1108,62 @@ inline void update_camera(RendererState* state, Input* input, Time* time) {
     move_vector.y = move_vector.y * 1.0f * delta_time;
     move_vector.z = move_vector.z * 1.0f * delta_time;
     
-    state->camera.position = state->camera.position + move_vector;
-    state->camera.context.view = look_from_yaw_and_pitch(state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
+    *state->camera.position = *state->camera.position + move_vector;
+    state->camera.context.view = look_from_yaw_and_pitch(*state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
+    
+    state->camera.context.light_position = new_vec3f(10.0f * cos(0.5f * PI * time->cumulated_time),
+                                                     0.0f,
+                                                     10.0f * sin(0.5f * PI * time->cumulated_time));
 }
 
 inline void update_entities(RendererState* state) {
-    memcpy(state->entity_resources.allocations[state->image_index].data, state->entity_resources.transforms, state->entity_count * sizeof(Mat4f));
-}
-
-inline void update_gui_funk(RendererState* state, Input* input) {
-    ConstString font_name = make_literal_string("ubuntu");
-    
-    char text[101];
-    String string = make_string(text, 100);
-    
-    // Top Line
-    u32 font_size = 30;
-    FontAtlas* font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, font_size);
-    
-    assert(font_atlas != 0);
-    i32 pos_x = 0;
-    i32 pos_y = 0;
-    string_format(string, "TopLeft");
-    ConstString const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 30, 30), TextAnchor::TopLeft, font_atlas);
-    
-    pos_x = state->swapchain_extent.width / 2;
-    pos_y = 0;
-    string_format(string, "TopMiddle");
-    const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 255, 30), TextAnchor::TopMiddle, font_atlas);
-    
-    pos_x = state->swapchain_extent.width;
-    pos_y = 0;
-    string_format(string, "TopRight");
-    const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 30, 255), TextAnchor::TopRight, font_atlas);
-    
-    // Centered Line
-    //font_size = 20;
-    font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, font_size);
-    assert(font_atlas != 0);
-    pos_x = 0;
-    pos_y = state->swapchain_extent.height / 2;
-    string_format(string, "MiddleLeft");
-    const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 255, 30), TextAnchor::MiddleLeft, font_atlas);
-    
-    pos_x = state->swapchain_extent.width / 2;
-    pos_y = state->swapchain_extent.height / 2;
-    string_format(string, "Center");
-    const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 30, 255), TextAnchor::Center, font_atlas);
-    
-    pos_x = state->swapchain_extent.width;
-    pos_y = state->swapchain_extent.height / 2;
-    string_format(string, "MiddleRight");
-    const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 255, 255), TextAnchor::MiddleRight, font_atlas);
-    
-    
-    // Bottom line
-    //font_size = 17;
-    font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, font_size);
-    assert(font_atlas != 0);
-    pos_x = 0;
-    pos_y = state->swapchain_extent.height;
-    string_format(string, "BottomLeft");
-    const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 255, 255), TextAnchor::BottomLeft, font_atlas);
-    
-    pos_x = state->swapchain_extent.width / 2;
-    pos_y = state->swapchain_extent.height;
-    string_format(string, "BottomMiddle");
-    const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(30, 30, 30), TextAnchor::BottomMiddle, font_atlas);
-    
-    pos_x = state->swapchain_extent.width;
-    pos_y = state->swapchain_extent.height;
-    string_format(string, "BottomRight");
-    const_string = make_const_string(&string);
-    draw_text(&state->gui_state, &const_string, pos_x, pos_y, new_coloru(255, 255, 255), TextAnchor::BottomRight, font_atlas);
+    memcpy(state->entity_resources.allocations[state->image_index].data, state->entity_resources.transform_data, state->entity_count * sizeof(EntityTransformData));
 }
 
 inline void update_gui(RendererState* state, Input* input) {
     reset_gui(&state->gui_state, &state->gui_resources);
     
-#if 0
-    draw_button(&state->gui_state, input,
-                false,
-                10, 10,
-                10 + 30, 10 + 200,
-                new_coloru(255, 0, 0),
-                new_coloru(255, 77, 77),
-                new_coloru(128, 0, 0));
+    Vec4f color = new_coloru(30, 30, 30);
+    Vec4f hover_color = new_coloru(40, 40, 40);
+    Vec4f active_color = new_coloru(10, 10, 10);
+    Vec4f text_color = new_coloru(200, 200, 200);
     
-    draw_button(&state->gui_state, input,
-                false,
-                50, 10,
-                50 + 30, 10 + 200,
-                new_coloru(0, 0, 255),
-                new_coloru(77, 77, 255),
-                new_coloru(0, 0, 128));
+    ConstString font_name = make_literal_string("ubuntu");
+    FontAtlas* font_atlas = get_font_atlas_from_catalog(&state->font_atlas_catalog, &font_name, 20);
+    assert(font_atlas != 0);
     
-    draw_button(&state->gui_state, input,
-                false,
-                90, 10,
-                90 + 30, 10 + 200,
-                new_coloru(0, 255, 0),
-                new_coloru(77, 255, 77),
-                new_coloru(0, 128, 0));
-#endif
+    char temp[101] = {};
+    String var_text = make_string(temp, 100);
     
-    update_gui_funk(state, input);
+    string_format(var_text, "Button 1");
+    ConstString text = make_const_string(&var_text);
+    draw_text_button(&state->gui_state, input,
+                     new_rect2i_dim(10, 10, 200, 30),
+                     &text,
+                     font_atlas,
+                     false,
+                     color, hover_color, active_color,
+                     text_color);
+    
+    string_format(var_text, "Button 2");
+    text = make_const_string(&var_text);
+    draw_text_button(&state->gui_state, input,
+                     new_rect2i_dim(10, 50, 200, 30),
+                     &text,
+                     font_atlas,
+                     false,
+                     color, hover_color, active_color,
+                     text_color);
+    
+    string_format(var_text, "Button 3");
+    text = make_const_string(&var_text);
+    draw_text_button(&state->gui_state, input,
+                     new_rect2i_dim(10, 90, 200, 30),
+                     &text,
+                     font_atlas,
+                     false,
+                     color, hover_color, active_color,
+                     text_color);
     
     memcpy(state->gui_resources.allocations[state->image_index].data, state->gui_state.vertex_buffer, state->gui_state.current_size * sizeof(GuiVertex));
 }
@@ -1222,9 +1239,9 @@ inline VkResult render(RendererState* state) {
     VkDeviceSize offset = 0;
     vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->camera_resources.descriptor_sets[state->image_index], 0, nullptr);
     
+    // Draw entities
     for (int i = 0;i < state->entity_count;++i) {
-        vkCmdBindDescriptorSets(
-                                command_buffer,
+        vkCmdBindDescriptorSets(command_buffer,
                                 VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 state->pipeline_layout,
                                 1, 1,
@@ -1240,26 +1257,6 @@ inline VkResult render(RendererState* state) {
     vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->gui_resources.pipeline_layout, 0, 1,
                             &state->font_atlas_catalog.resources.descriptor_set, 0, nullptr);
     vkCmdDraw(command_buffer, state->gui_state.current_size, 1, 0, 0);
-#if 0
-    // NOTE: this is how I want to use the gui data to render the gui
-    
-    // Bind the pipeline and the vertex buffer
-    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->gui_resources.pipeline);
-    vkCmdBindVertexBuffers(command_buffer, 0, 1, &state->gui_resources.buffers[state->image_index], &offset);
-    
-    GuiDrawInfoEntry* entry = state->gui_state.draw_info_list;
-    while (entry) {
-        GuiDrawInfo* draw_info = &entry->draw_info;
-        FontAtlas* font_atlas = draw_info->font_atlas;
-        
-        vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->gui_resources.pipeline_layout, 0, 1,I
-                                &font_atlas->resources->descriptor_set, 0, nullptr);
-        vkCmdDraw(command_buffer, draw_info->count, 1, draw_info->start, 0);
-        
-        entry = entry->next;
-    }
-#endif
-    
     vkCmdEndRenderPass(command_buffer);
     vkEndCommandBuffer(command_buffer);
     

@@ -8,6 +8,7 @@ project(vk_renderer)
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
+find_package(assimp REQUIRED)
 
 link_directories(/usr/local/lib/)
 
@@ -16,7 +17,7 @@ add_compile_options(-std=c++17 -pthread -fno-exceptions)
 
 if (CMAKE_BUILD_TYPE MATCHES Release)
 	message("Optimization enabled")
-	add_compile_options(-O3)
+	add_compile_options(-O3 -DNDEBUG)
 endif(CMAKE_BUILD_TYPE MATCHES Release)
 
 add_subdirectory(src)
