@@ -110,6 +110,16 @@ char* to_string(GuiState* state, MemoryArena* temporary_storage, u32 indentation
 // Public
 void draw_rectangle(GuiState* state, i32 left, i32 top, i32 right, i32 bottom, Vec4f color);
 void draw_rectangle(GuiState* state, Rect2i bound, Vec4f color);
+void draw_text_rectangle(GuiState* state,
+                         i32 left, i32 top, i32 right, i32 bottom,
+                         ConstString* text,
+                         FontAtlas* font_atlas,
+                         Vec4f color, Vec4f text_color);
+void draw_text_rectangle(GuiState* state,
+                         Rect2i bound,
+                         ConstString* text,
+                         FontAtlas* font_atlas,
+                         Vec4f color, Vec4f text_color);
 
 bool draw_button(GuiState* state, Input* input,
                  i32 left, i32 top, i32 right, i32 bottom,

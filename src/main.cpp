@@ -10,7 +10,7 @@
 //#define OBJ_CUSTOM
 
 #ifdef NDEBUG
-#warning "No debuf mode"
+#warning "No debug mode"
 #endif
 
 #include "cg_types.h"
@@ -29,7 +29,9 @@
 #include "cg_renderer.h"
 #include "cg_shaders.h"
 #include "cg_string.h"
+#include "cg_material.h"
 #include "cg_memory_arena.h"
+#include "cg_random.h"
 #include "cg_texture.h"
 #include "cg_temporary_memory.h"
 #include "cg_timer.h"
@@ -68,7 +70,9 @@
 #include "cg_obj_loader.cpp"
 #include "cg_shaders.cpp"
 #include "cg_string.cpp"
+#include "cg_material.cpp"
 #include "cg_memory_arena.cpp"
+#include "cg_random.cpp"
 #include "cg_texture.cpp"
 #include "cg_temporary_memory.cpp"
 #include "cg_timer.cpp"
@@ -128,7 +132,7 @@ inline void update_fps_counter(RendererState* state, GLFWwindow* window, FpsCoun
     
     TemporaryMemory temporary_memory = make_temporary_memory(&state->main_arena);
     
-    if (fps_counter->frame_count == 100) {
+    if (fps_counter->frame_count == state->temp_data.frame_count_update) {
         f64 average_frame_duration = (f64)fps_counter->cumulated_frame_duration / (f64)fps_counter->frame_count;
         average_frame_duration /= 1000000000.0;
         
@@ -139,6 +143,9 @@ inline void update_fps_counter(RendererState* state, GLFWwindow* window, FpsCoun
         
         string_format(temp, "%f fps", 1.0 / average_frame_duration);
         glfwSetWindowTitle(window, temp.str);
+        
+        u32 int_fps = 1.0 / average_frame_duration;
+        state->temp_data.frame_count_update = int_fps;
     }
     
     char* data = (char*)allocate(&temporary_memory, 100000000);
@@ -434,6 +441,146 @@ inline void create_cube(Vec3f size, Vertex* vertices) {
     vertices[35].normal = new_vec3f(0.0f, -1.0f, 0.0f);
 }
 
+inline void create_cube(Vec3f size, Vec3f color, Vertex* vertices) {
+    // Front face
+    vertices[ 0].position = new_vec3f(-size.x, -size.y,  size.z);
+    vertices[ 1].position = new_vec3f(-size.x,  size.y,  size.z);
+    vertices[ 2].position = new_vec3f( size.x, -size.y,  size.z);
+    
+    vertices[ 3].position = new_vec3f( size.x, -size.y,  size.z);
+    vertices[ 4].position = new_vec3f(-size.x,  size.y,  size.z);
+    vertices[ 5].position = new_vec3f( size.x,  size.y,  size.z);
+    
+    vertices[ 0].color = color;
+    vertices[ 1].color = color;
+    vertices[ 2].color = color;
+    vertices[ 3].color = color;
+    vertices[ 4].color = color;
+    vertices[ 5].color = color;
+    
+    vertices[ 0].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 1].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 2].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 3].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 4].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    vertices[ 5].normal = new_vec3f(0.0f, 0.0f, 1.0f);
+    
+    // Right face
+    vertices[ 6].position = new_vec3f( size.x, -size.y,  size.z);
+    vertices[ 7].position = new_vec3f( size.x,  size.y,  size.z);
+    vertices[ 8].position = new_vec3f( size.x, -size.y, -size.z);
+    
+    vertices[ 9].position = new_vec3f( size.x, -size.y, -size.z);
+    vertices[10].position = new_vec3f( size.x,  size.y,  size.z);
+    vertices[11].position = new_vec3f( size.x,  size.y, -size.z);
+    
+    vertices[ 6].color = color;
+    vertices[ 7].color = color;
+    vertices[ 8].color = color;
+    vertices[ 9].color = color;
+    vertices[10].color = color;
+    vertices[11].color = color;
+    
+    vertices[ 6].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[ 7].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[ 8].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[ 9].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[10].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    vertices[11].normal = new_vec3f(1.0f, 0.0f, 0.0f);
+    
+    // Back face
+    vertices[12].position = new_vec3f( size.x, -size.y, -size.z);
+    vertices[13].position = new_vec3f( size.x,  size.y, -size.z);
+    vertices[14].position = new_vec3f(-size.x, -size.y, -size.z);
+    
+    vertices[15].position = new_vec3f(-size.x, -size.y, -size.z);
+    vertices[16].position = new_vec3f( size.x,  size.y, -size.z);
+    vertices[17].position = new_vec3f(-size.x,  size.y, -size.z);
+    
+    vertices[12].color = color;
+    vertices[13].color = color;
+    vertices[14].color = color;
+    vertices[15].color = color;
+    vertices[16].color = color;
+    vertices[17].color = color;
+    
+    vertices[12].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[13].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[14].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[15].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[16].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    vertices[17].normal = new_vec3f(0.0f, 0.0f, -1.0f);
+    
+    // Left face
+    vertices[18].position = new_vec3f(-size.x, -size.y, -size.z);
+    vertices[19].position = new_vec3f(-size.x,  size.y, -size.z);
+    vertices[20].position = new_vec3f(-size.x, -size.y,  size.z);
+    
+    vertices[21].position = new_vec3f(-size.x, -size.y,  size.z);
+    vertices[22].position = new_vec3f(-size.x,  size.y, -size.z);
+    vertices[23].position = new_vec3f(-size.x,  size.y,  size.z);
+    
+    vertices[18].color = color;
+    vertices[19].color = color;
+    vertices[20].color = color;
+    vertices[21].color = color;
+    vertices[22].color = color;
+    vertices[23].color = color;
+    
+    vertices[18].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[19].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[20].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[21].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[22].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    vertices[23].normal = new_vec3f(-1.0f, 0.0f, 0.0f);
+    
+    // Top face
+    vertices[24].position = new_vec3f( size.x,  size.y,  size.z);
+    vertices[25].position = new_vec3f(-size.x,  size.y,  size.z);
+    vertices[26].position = new_vec3f( size.x,  size.y, -size.z);
+    
+    vertices[27].position = new_vec3f( size.x,  size.y, -size.z);
+    vertices[28].position = new_vec3f(-size.x,  size.y,  size.z);
+    vertices[29].position = new_vec3f(-size.x,  size.y, -size.z);
+    
+    vertices[24].color = color;
+    vertices[25].color = color;
+    vertices[26].color = color;
+    vertices[27].color = color;
+    vertices[28].color = color;
+    vertices[29].color = color;
+    
+    vertices[24].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[25].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[26].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[27].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[28].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    vertices[29].normal = new_vec3f(0.0f, 1.0f, 0.0f);
+    
+    // Bottom face
+    vertices[30].position = new_vec3f(-size.x, -size.y,  size.z);
+    vertices[31].position = new_vec3f( size.x, -size.y,  size.z);
+    vertices[32].position = new_vec3f( size.x, -size.y, -size.z);
+    
+    vertices[33].position = new_vec3f( size.x, -size.y, -size.z);
+    vertices[34].position = new_vec3f(-size.x, -size.y, -size.z);
+    vertices[35].position = new_vec3f(-size.x, -size.y,  size.z);
+    
+    vertices[30].color = color;
+    vertices[31].color = color;
+    vertices[32].color = color;
+    vertices[33].color = color;
+    vertices[34].color = color;
+    vertices[35].color = color;
+    
+    vertices[30].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[31].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[32].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[33].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[34].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+    vertices[35].normal = new_vec3f(0.0f, -1.0f, 0.0f);
+}
+
 inline Mat4f random_translation_matrix(f32 range) {
     return translation_matrix(2.0f * randf() * range - range,
                               2.0f * randf() * range - range,
@@ -446,7 +593,7 @@ inline Mat4f random_rotation_matrix() {
                            2.0f * PI * randf());
 }
 
-inline bool create_cube_entity(RendererState* state) {
+inline bool create_cube_entity(RendererState* state, Mat4f transform_matrix) {
     Vertex vertex_buffer[36] = {};
     create_cube(new_vec3f(0.2f, 0.2f, 0.2f), vertex_buffer);
     
@@ -458,12 +605,42 @@ inline bool create_cube_entity(RendererState* state) {
     
     Entity* entity = &state->entities[entity_id - 1];
     
-    Mat4f t = random_translation_matrix(5.0f);
-    Mat4f r = random_rotation_matrix();
-    entity->transform_data->model_matrix= t * r;
+    entity->transform_data->model_matrix = transform_matrix;
     entity->transform_data->normal_matrix = transpose_inverse(&entity->transform_data->model_matrix);
     
     return true;
+}
+
+inline bool create_cube_entity(RendererState* state) {
+    Mat4f t = random_translation_matrix(5.0f);
+    Mat4f r = random_rotation_matrix();
+    return create_cube_entity(state, t * r);
+}
+
+inline bool create_cube_entity(RendererState* state, Vec3f position) {
+    return create_cube_entity(state, translation_matrix(position.x, position.y, position.z));
+}
+
+inline bool create_cube_entity_color(RendererState* state, Mat4f transform_matrix, Vec3f color) {
+    Vertex vertex_buffer[36] = {};
+    create_cube(new_vec3f(0.2f, 0.2f, 0.2f), color, vertex_buffer);
+    
+    u32 entity_id = 0;
+    
+    if(!create_entity(state, vertex_buffer, array_size(vertex_buffer), &entity_id)) {
+        return false;
+    }
+    
+    Entity* entity = &state->entities[entity_id - 1];
+    
+    entity->transform_data->model_matrix = transform_matrix;
+    entity->transform_data->normal_matrix = transpose_inverse(&entity->transform_data->model_matrix);
+    
+    return true;
+}
+
+inline bool create_cube_entity_color(RendererState* state, Vec3f position, Vec3f color) {
+    return create_cube_entity_color(state, translation_matrix(position.x, position.y, position.z), color);
 }
 
 inline bool allocate_camera_descriptor_sets(RendererState* state) {
@@ -571,7 +748,9 @@ inline bool init_camera(RendererState* state) {
     *state->camera.position = new_vec3f(0.0f, 0.0f, 0.0f);
     state->camera.yaw = -PI_2;
     state->camera.pitch = 0.0f;
-    state->camera.speed = 0.0015f;
+    state->camera.mouse_sensitivity = 0.0015f;
+    state->camera.speed= 1.0f;
+    state->camera.boost_speed = state->camera.speed * 5.0f;
     state->camera.aspect = (f32)state->swapchain_extent.width / (f32)state->swapchain_extent.height;
     
     state->camera.context.projection = perspective(state->camera.fov, state->camera.aspect, 0.1f, 100.0f);
@@ -933,6 +1112,7 @@ inline bool init_font(RendererState* state) {
 }
 
 inline bool init(RendererState* state, WindowUserData* window_user_data) {
+    init_random();
     if (!init_memory_arena(&state->temporary_storage)) {
         println("Error: failed to initialize temporary_storage");
         return false;
@@ -974,6 +1154,40 @@ inline bool init(RendererState* state, WindowUserData* window_user_data) {
         println("font init: success");
     }
     
+    if (!init_material_catalog(&state->material_catalog, state)) {
+        return false;
+    } else {
+        println("material catalog init : success");
+    }
+    
+    u64 start = get_time_ns();
+    if (!add_named_material(&state->material_catalog, {}, make_literal_string("steel_material"))) {
+        return false;
+    }
+    
+    if (!add_named_material(&state->material_catalog, {}, make_literal_string("concrete_material"))) {
+        return false;
+    }
+    
+    if (!add_named_material(&state->material_catalog, {}, make_literal_string("grass_material"))) {
+        return false;
+    }
+    u64 end = get_time_ns();
+    println("Building material catalog took %lu ns", (end - start));
+    
+    println("Current entries:");
+    for (u32 i = 0;i < state->material_catalog.entry_count;++i) {
+        MaterialEntry* entry = state->material_catalog.material_entries + i;
+        println("    %s: %u", entry->material_name.str, entry->index);
+    }
+    
+    ConstString material_name = make_literal_string("steel_material");
+    i32 material_index = get_named_material_index(&state->material_catalog, material_name);
+    if (material_index < 0) {
+        println("Error: failed to get '%s' material", material_name.str);
+        return false;
+    }
+    
     if (!init_camera(state)) {
         return false;
     } else {
@@ -986,15 +1200,26 @@ inline bool init(RendererState* state, WindowUserData* window_user_data) {
         println("entities init : success");
     }
     
-    for (int i = 0;i < 10;++i) {
-        if (!create_cube_entity(state)) {
-            return false;
-        } else {
-            println("cube entity %d init : success", i);
-        }
+    if (!create_cube_entity(state, new_vec3f(1.0f, 0.0f, 0.0f))) {
+        return false;
+    }
+    if (!create_cube_entity(state, new_vec3f(-1.0f, 0.0f, 0.0f))) {
+        return false;
+    }
+    if (!create_cube_entity(state, new_vec3f(0.0f, 0.0f, 1.0f))) {
+        return false;
+    }
+    if (!create_cube_entity(state, new_vec3f(0.0f, 0.0f, -1.0f))) {
+        return false;
     }
     
-    u64 start = get_time_ns();
+    if (!create_cube_entity_color(state, new_vec3f(0.0f, 0.0f, 0.0f), new_vec3f(1.0f, 1.0f, 1.0f))) {
+        return false;
+    }
+    
+    state->temp_data.light_entity_id = state->entity_count - 1;
+    
+    start = get_time_ns();
     String obj_filename_var = push_string(&state->temporary_storage, 100);
     string_format(obj_filename_var, "%s/resources/models/obj/Trumpet.obj", PROGRAM_ROOT);
     ConstString obj_filename = make_const_string(&obj_filename_var);
@@ -1005,7 +1230,7 @@ inline bool init(RendererState* state, WindowUserData* window_user_data) {
     if (!load_obj_file(&obj_filename, &vertex_buffer, &vertex_buffer_size, &state->main_arena)) {
         return false;
     }
-    u64 end = get_time_ns();
+    end = get_time_ns();
     
     println("Loading took %f s", (f32)(end - start) / (f32)1e9);
     
@@ -1013,6 +1238,8 @@ inline bool init(RendererState* state, WindowUserData* window_user_data) {
     if (!create_entity(state, vertex_buffer, vertex_buffer_size, &trumpet_id)) {
         return false;
     }
+    
+    state->entities[state->entity_count - 1].transform_data->model_matrix = translation_matrix(0.0f, 3.0f, 0.0f);
     
     glfwSetWindowUserPointer(state->window, window_user_data);
     glfwSetKeyCallback(state->window, key_callback);
@@ -1023,6 +1250,8 @@ inline bool init(RendererState* state, WindowUserData* window_user_data) {
     state->cursor_locked = true;
     glfwSetInputMode(state->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPos(state->window, state->swapchain_extent.width / 2, state->swapchain_extent.height / 2);
+    
+    state->temp_data.frame_count_update = 60;
     
     return true;
 }
@@ -1071,22 +1300,31 @@ inline void update_time(Time* time) {
 }
 
 inline void update_camera(RendererState* state, Input* input, Time* time) {
+    Camera* camera = &state->camera;
+    
     if (state->cursor_locked) {
-        state->camera.yaw -= input->mouse_delta_x * state->camera.speed;
-        state->camera.pitch += input->mouse_delta_y * state->camera.speed;
+        camera->yaw -= input->mouse_delta_x * camera->mouse_sensitivity;
+        camera->pitch += input->mouse_delta_y * camera->mouse_sensitivity;
     }
     
-    if (state->camera.yaw > 2.0 * PI) {
-        state->camera.yaw -= 2.0 * PI;
-    } else if (state->camera.yaw < -2.0 * PI) {
-        state->camera.yaw += 2.0 * PI;
+    if (camera->yaw > 2.0 * PI) {
+        camera->yaw -= 2.0 * PI;
+    } else if (camera->yaw < -2.0 * PI) {
+        camera->yaw += 2.0 * PI;
     }
-    state->camera.pitch = clamp(state->camera.pitch, - PI_2, PI_2);
+    camera->pitch = clamp(camera->pitch, - PI_2, PI_2);
     
-    Vec3f forward = new_vec3f(-sin(state->camera.yaw) * cos(state->camera.pitch), -sin(state->camera.pitch), -cos(state->camera.yaw) * cos(state->camera.pitch));
-    Vec3f side = new_vec3f(cos(state->camera.yaw), 0.0f, -sin(state->camera.yaw));
+    Vec3f forward = new_vec3f(-sin(camera->yaw) * cos(camera->pitch), -sin(camera->pitch), -cos(camera->yaw) * cos(camera->pitch));
+    Vec3f side = new_vec3f(cos(camera->yaw), 0.0f, -sin(camera->yaw));
     
     Vec3f move_vector = new_vec3f();
+    
+    f32 camera_speed = 0.0f;
+    if (input->key_pressed[GLFW_KEY_LEFT_SHIFT]) {
+        camera_speed = camera->boost_speed;
+    } else {
+        camera_speed = camera->speed;
+    }
     
     if (input->key_pressed[GLFW_KEY_W]) {
         move_vector = move_vector + forward;
@@ -1104,24 +1342,39 @@ inline void update_camera(RendererState* state, Input* input, Time* time) {
     f64 delta_time = time->delta_time;
     
     move_vector = normalize(&move_vector);
-    move_vector.x = move_vector.x * 1.0f * delta_time;
-    move_vector.y = move_vector.y * 1.0f * delta_time;
-    move_vector.z = move_vector.z * 1.0f * delta_time;
+    move_vector.x = move_vector.x * camera_speed * delta_time;
+    move_vector.y = move_vector.y * camera_speed * delta_time;
+    move_vector.z = move_vector.z * camera_speed * delta_time;
     
-    *state->camera.position = *state->camera.position + move_vector;
-    state->camera.context.view = look_from_yaw_and_pitch(*state->camera.position, state->camera.yaw, state->camera.pitch, new_vec3f(0.0f, 1.0f, 0.0f));
+    *camera->position = *camera->position + move_vector;
+    camera->context.view = look_from_yaw_and_pitch(*camera->position, camera->yaw, camera->pitch, new_vec3f(0.0f, 1.0f, 0.0f));
     
-    state->camera.context.light_position = new_vec3f(10.0f * cos(0.5f * PI * time->cumulated_time),
-                                                     0.0f,
-                                                     10.0f * sin(0.5f * PI * time->cumulated_time));
+    f32 rotation_speed = (f32)state->temp_data.rotation_speed;
+    
+    f32* angle = &state->temp_data.current_angle;
+    *angle += rotation_speed * delta_time * 0.25f;
+    
+    camera->context.light_position = new_vec3f(3.0f * cos(2.0f * PI * *angle),
+                                               0.0f,
+                                               3.0f * sin(2.0f * PI * *angle));
 }
 
 inline void update_entities(RendererState* state) {
+    // Update light cube position
+    Vec3f* light_position = &state->camera.context.light_position;
+    Entity* light_entity = &state->entities[state->temp_data.light_entity_id];
+    Mat4f* light_model_matrix = &light_entity->transform_data->model_matrix;
+    *light_model_matrix = translation_matrix(light_position->x, light_position->y, light_position->z);
+    Mat4f* light_normal_matrix = &light_entity->transform_data->normal_matrix;
+    *light_normal_matrix = transpose_inverse(light_model_matrix);
+    
     memcpy(state->entity_resources.allocations[state->image_index].data, state->entity_resources.transform_data, state->entity_count * sizeof(EntityTransformData));
 }
 
 inline void update_gui(RendererState* state, Input* input) {
     reset_gui(&state->gui_state, &state->gui_resources);
+    
+    GuiState* gui_state = &state->gui_state;
     
     Vec4f color = new_coloru(30, 30, 30);
     Vec4f hover_color = new_coloru(40, 40, 40);
@@ -1135,35 +1388,50 @@ inline void update_gui(RendererState* state, Input* input) {
     char temp[101] = {};
     String var_text = make_string(temp, 100);
     
-    string_format(var_text, "Button 1");
+    string_format(var_text, "<");
     ConstString text = make_const_string(&var_text);
-    draw_text_button(&state->gui_state, input,
-                     new_rect2i_dim(10, 10, 200, 30),
-                     &text,
-                     font_atlas,
-                     false,
-                     color, hover_color, active_color,
-                     text_color);
+    bool minus_button_status = draw_text_button(gui_state, input,
+                                                new_rect2i_dim(10, 10, 30, 30),
+                                                &text,
+                                                font_atlas,
+                                                state->temp_data.minus_button_status,
+                                                color, hover_color, active_color,
+                                                text_color);
+    if (minus_button_status) {
+        if (!state->temp_data.minus_button_status) {
+            state->temp_data.minus_button_status = true;
+        }
+    } else {
+        if (state->temp_data.minus_button_status) {
+            state->temp_data.rotation_speed -= 1;
+            state->temp_data.minus_button_status = false;
+        }
+    }
     
-    string_format(var_text, "Button 2");
+    string_format(var_text, "Current Speed: %i", state->temp_data.rotation_speed);
     text = make_const_string(&var_text);
-    draw_text_button(&state->gui_state, input,
-                     new_rect2i_dim(10, 50, 200, 30),
-                     &text,
-                     font_atlas,
-                     false,
-                     color, hover_color, active_color,
-                     text_color);
+    draw_text_rectangle(gui_state, new_rect2i_dim(45, 10, 200, 30), &text, font_atlas, color, text_color);
     
-    string_format(var_text, "Button 3");
+    string_format(var_text, ">");
     text = make_const_string(&var_text);
-    draw_text_button(&state->gui_state, input,
-                     new_rect2i_dim(10, 90, 200, 30),
-                     &text,
-                     font_atlas,
-                     false,
-                     color, hover_color, active_color,
-                     text_color);
+    bool plus_button_status = draw_text_button(gui_state, input,
+                                               new_rect2i_dim(250, 10, 30, 30),
+                                               &text,
+                                               font_atlas,
+                                               state->temp_data.plus_button_status,
+                                               color, hover_color, active_color,
+                                               text_color);
+    
+    if (plus_button_status) {
+        if (!state->temp_data.plus_button_status) {
+            state->temp_data.plus_button_status = true;
+        }
+    } else {
+        if (state->temp_data.plus_button_status) {
+            state->temp_data.rotation_speed += 1;
+            state->temp_data.plus_button_status = false;
+        }
+    }
     
     memcpy(state->gui_resources.allocations[state->image_index].data, state->gui_state.vertex_buffer, state->gui_state.current_size * sizeof(GuiVertex));
 }
@@ -1191,8 +1459,8 @@ inline void update(RendererState* state, Input* input, Time* time) {
     }
     
     if (input->key_just_pressed[GLFW_KEY_Y]) {
-        state->counter = 0;
-        state->updater = 1;
+        state->temp_data.counter = 0;
+        state->temp_data.updater = 1;
     }
 }
 
@@ -1259,6 +1527,7 @@ inline VkResult render(RendererState* state) {
     vkCmdDraw(command_buffer, state->gui_state.current_size, 1, 0, 0);
     vkCmdEndRenderPass(command_buffer);
     vkEndCommandBuffer(command_buffer);
+    
     
     VkPipelineStageFlags stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     VkSubmitInfo submit_info = {};
@@ -1448,6 +1717,7 @@ inline void cleanup(RendererState* state) {
     destroy_camera(state, true);
     
     cleanup_gui(&state->gui_state, &state->gui_resources, state, true);
+    destroy_material_catalog(&state->material_catalog, state, true);
     destroy_font_atlas_catalog(state, &state->font_atlas_catalog, true);
     cleanup_texture_catalog(state, true);
     destroy_framebuffers(state, true);

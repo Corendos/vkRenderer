@@ -40,4 +40,7 @@ String push_string(TemporaryMemory* temporary_storage, u64 size);
 ConstString push_string_copy(MemoryArena* storage, ConstString* src);
 ConstString push_string_copy(TemporaryMemory* temporary_storage, ConstString* src);
 
+i32 string_compare(ConstString a, ConstString b);
+i32 string_compare(String a, String b);
+
 #endif //CG_STRING_H

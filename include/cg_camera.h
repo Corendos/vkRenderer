@@ -26,7 +26,9 @@ struct Camera {
     f32 yaw;
     f32 pitch;
     
+    f32 mouse_sensitivity;
     f32 speed;
+    f32 boost_speed;
     
     CameraContext context;
 };

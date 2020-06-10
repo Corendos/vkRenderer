@@ -257,7 +257,7 @@ inline u32 get_present_mode_score(VkPresentModeKHR present_mode) {
     u32 score = 0;
     switch (present_mode) {
         case VK_PRESENT_MODE_IMMEDIATE_KHR:
-        score = 40;
+        score = 10;
         break;
         case VK_PRESENT_MODE_MAILBOX_KHR:
         score = 20;

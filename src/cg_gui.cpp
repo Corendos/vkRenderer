@@ -534,6 +534,31 @@ inline void draw_rectangle(GuiState* state, Rect2i bound, Vec4f color) {
     draw_rectangle(state, bound.left, bound.top, bound.right, bound.bottom, color);
 }
 
+inline void draw_text_rectangle(GuiState* state,
+                                Rect2i bound,
+                                ConstString* text,
+                                FontAtlas* font_atlas,
+                                Vec4f color,
+                                Vec4f text_color) {
+    draw_text_rectangle(state, bound.left, bound.top, bound.right, bound.bottom, text, font_atlas, color, text_color);
+}
+
+inline void draw_text_rectangle(GuiState* state,
+                                i32 left, i32 top, i32 right, i32 bottom,
+                                ConstString* text,
+                                FontAtlas* font_atlas,
+                                Vec4f color,
+                                Vec4f text_color) {
+    draw_rectangle(state, left, top, right, bottom, color);
+    
+    i32 center_x = (left + right) / 2;
+    i32 center_y = (top + bottom) / 2;
+    TextAnchor text_anchor = TextAnchor::Center;
+    
+    draw_text(state, text, center_x, center_y, text_color, text_anchor, font_atlas);
+}
+
+
 inline bool draw_button(GuiState* state, Input* input,
                         i32 left, i32 top, i32 right, i32 bottom,
                         bool button_state,

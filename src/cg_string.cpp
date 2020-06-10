@@ -68,3 +68,12 @@ inline ConstString push_string_copy(MemoryArena* storage, ConstString* src) {
 inline ConstString push_string_copy(TemporaryMemory* temporary_storage, ConstString* src) {
     return push_string_copy(temporary_storage->arena, src);
 }
+
+
+inline i32 string_compare(ConstString a, ConstString b) {
+    return strcmp(a.str, b.str);
+}
+
+inline i32 string_compare(String a, String b) {
+    return strcmp(a.str, b.str);
+}

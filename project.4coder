@@ -31,6 +31,11 @@ load_paths_base = {
 		.relative = true,
 		.recursive = true,
 	},
+	{
+		"./resources/shaders/",
+		.relative = true,
+		.recursive = true,
+	},
 };
 
 load_paths = {
@@ -56,15 +61,15 @@ command_list = {
 		.save_dirty_files = true,
 		.cmd = {
 			{
-				"build_debug.bat" ,
+				"./build_scripts/build_debug.bat" ,
 				.os = "win"
 			},
             {
-				"./build_debug.sh",
+				"./build_scripts/build_debug.sh",
 				.os = "linux"
 			},
             {
-				"./build_debug.sh",
+				"./build_scripts/build_debug.sh",
 				.os = "mac"
 			},
 		},
@@ -76,15 +81,15 @@ command_list = {
 		.save_dirty_files = true,
 		.cmd = {
 			{
-				"./build_release.bat" ,
+				"./build_scripts/build_release.bat" ,
 				.os = "win"
 			},
             {
-				"./build_release.sh",
+				"./build_scripts/build_release.sh",
 				.os = "linux"
 			},
             {
-				"./build_release.sh",
+				"./build_scripts/build_release.sh",
 				.os = "mac"
 			},
 		},
@@ -139,15 +144,15 @@ command_list = {
 		.cursor_at_end = true,
 		.cmd = {
 			{
-				"./build_test.bat",
+				"./build_scripts/build_test.bat",
 				.os = "win"
 			},
             {
-				"./build_test.sh",
+				"./build_scripts/build_test.sh",
 				.os = "linux"
 			},
             {
-				"./build_test.sh",
+				"./build_scripts/build_test.sh",
 				.os = "mac"
 			},
 		},

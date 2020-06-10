@@ -17,7 +17,7 @@ inline Vec2f assimp_vector_to_vec2f(aiVector3D src) {
 
 inline bool load_obj_file(ConstString* filename, Vertex** vertex_buffer, u32* vertex_buffer_size, MemoryArena* storage) {
     const aiScene* scene = aiImportFile(filename->str,
-                                        aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_SortByPType | aiProcess_GenSmoothNormals | aiProcess_FlipWindingOrder);
+                                        aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_SortByPType | aiProcess_GenNormals | aiProcess_FlipWindingOrder);
     
     if (scene == 0) {
         println("Error: %s", aiGetErrorString());

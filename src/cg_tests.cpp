@@ -36,6 +36,8 @@ void print_matrix(Mat4f m) {
 }
 
 int main() {
+    println("bjr");
+    return 0;
     srand(get_time_ns());
     
     u64 cumulated_time = 0;

@@ -11,6 +11,7 @@
 #include "cg_math.h"
 #include "cg_camera.h"
 #include "cg_gui.h"
+#include "cg_material.h"
 #include "cg_memory_arena.h"
 #include "cg_fonts.h"
 #include "cg_vertex.h"
@@ -57,6 +58,20 @@ struct EntityResources {
     VkDescriptorSet* descriptor_sets;
     AllocatedMemoryChunk* allocations;
     EntityTransformData transform_data[MAX_ENTITY_COUNT];
+};
+
+struct TempData {
+    u64 counter;
+    u64 updater;
+    
+    u32 frame_count_update;
+    
+    u32 light_entity_id;
+    
+    i32 rotation_speed;
+    f32 current_angle;
+    bool minus_button_status;
+    bool plus_button_status;
 };
 
 struct RendererState {
@@ -107,6 +122,8 @@ struct RendererState {
     FontCatalog font_catalog;
     FontAtlasCatalog font_atlas_catalog;
     
+    MaterialCatalog material_catalog;
+    
     bool cursor_locked;
     
     GuiState gui_state;
@@ -119,8 +136,7 @@ struct RendererState {
     MemoryArena temporary_storage;
     MemoryArena main_arena;
     
-    u64 counter;
-    u64 updater;
+    TempData temp_data;
 };
 
 #endif
